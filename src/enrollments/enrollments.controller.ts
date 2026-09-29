@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseIntPipe,
-  Post,
-  Query,
+import {Body,Controller,Delete,Get,Param,ParseIntPipe,Post,Query,
 } from '@nestjs/common';
 
 import { EnrollmentsService } from './enrollments.service';
