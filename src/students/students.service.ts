@@ -5,28 +5,28 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { FilterStudentDto } from './dto/filter-student.dto';
 
-export interface Student {
-  id: number;
-  name: string;
-  email: string;
-  age: number;
-  career: string;
-  semester: number;
-  isActive: boolean;
-}
+import { Student } from './entities/student.entity';
+
 @Injectable()
 export class StudentsService {
-  private students: Student[] = [];
-  private nextId = 1;
+  constructor(
+    @InjectRepository(Student)
+    private readonly studentsRepository: Repository<Student>,
+  ) {}
 
-  create(createStudentDto: CreateStudentDto): Student {
-    const emailExists = this.students.some(
-      (student) => student.email === createStudentDto.email,
-    );
+  async create(createStudentDto: CreateStudentDto): Promise<Student> {
+    const emailExists = await this.studentsRepository.findOne({
+      where: {
+        email: createStudentDto.email,
+      },
+    });
 
     if (emailExists) {
       throw new ConflictException(
@@ -34,45 +34,44 @@ export class StudentsService {
       );
     }
 
-    const student: Student = {
-      id: this.nextId++,
-      ...createStudentDto,
-    };
+    const student = this.studentsRepository.create(createStudentDto);
 
-    this.students.push(student);
-
-    return student;
+    return this.studentsRepository.save(student);
   }
 
-  findAll(filters?: FilterStudentDto): Student[] {
-  return this.students.filter((student) => {
-    if (
-      filters?.career &&
-      student.career.toLowerCase() !== filters.career.toLowerCase()
-    ) {
-      return false;
-    }
+  async findAll(filters?: FilterStudentDto): Promise<Student[]> {
+    const students = await this.studentsRepository.find();
 
-    if (
-      filters?.semester !== undefined &&
-      student.semester !== filters.semester
-    ) {
-      return false;
-    }
+    return students.filter((student) => {
+      if (
+        filters?.career &&
+        student.career.toLowerCase() !== filters.career.toLowerCase()
+      ) {
+        return false;
+      }
 
-    if (
-      filters?.isActive !== undefined &&
-      student.isActive !== filters.isActive
-    ) {
-      return false;
-    }
+      if (
+        filters?.semester !== undefined &&
+        student.semester !== filters.semester
+      ) {
+        return false;
+      }
 
-    return true;
-  });
-}
+      if (
+        filters?.isActive !== undefined &&
+        student.isActive !== filters.isActive
+      ) {
+        return false;
+      }
 
-  findOne(id: number): Student {
-    const student = this.students.find((student) => student.id === id);
+      return true;
+    });
+  }
+
+  async findOne(id: number): Promise<Student> {
+    const student = await this.studentsRepository.findOne({
+      where: { id },
+    });
 
     if (!student) {
       throw new NotFoundException(
@@ -83,16 +82,21 @@ export class StudentsService {
     return student;
   }
 
-  update(id: number, updateStudentDto: UpdateStudentDto): Student {
-    const student = this.findOne(id);
+  async update(
+    id: number,
+    updateStudentDto: UpdateStudentDto,
+  ): Promise<Student> {
+    const student = await this.findOne(id);
 
     if (
       updateStudentDto.email &&
       updateStudentDto.email !== student.email
     ) {
-      const emailExists = this.students.some(
-        (student) => student.email === updateStudentDto.email,
-      );
+      const emailExists = await this.studentsRepository.findOne({
+        where: {
+          email: updateStudentDto.email,
+        },
+      });
 
       if (emailExists) {
         throw new ConflictException(
@@ -103,11 +107,11 @@ export class StudentsService {
 
     Object.assign(student, updateStudentDto);
 
-    return student;
+    return this.studentsRepository.save(student);
   }
 
-  remove(id: number): Student {
-    const student = this.findOne(id);
+  async remove(id: number): Promise<Student> {
+    const student = await this.findOne(id);
 
     if (!student.isActive) {
       throw new BadRequestException(
@@ -115,20 +119,19 @@ export class StudentsService {
       );
     }
 
-    const index = this.students.findIndex(
-      (student) => student.id === id,
-    );
-
-    this.students.splice(index, 1);
+    await this.studentsRepository.remove(student);
 
     return student;
   }
 
-  changeStatus(id: number, isActive: boolean): Student {
-    const student = this.findOne(id);
+  async changeStatus(
+    id: number,
+    isActive: boolean,
+  ): Promise<Student> {
+    const student = await this.findOne(id);
 
     student.isActive = isActive;
 
-    return student;
+    return this.studentsRepository.save(student);
   }
 }

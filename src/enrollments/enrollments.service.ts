@@ -25,20 +25,18 @@ export class EnrollmentsService {
     private readonly studentsService: StudentsService,
   ) {}
 
-  create(createEnrollmentDto: CreateEnrollmentDto): Enrollment {
+  async create(createEnrollmentDto: CreateEnrollmentDto): Promise<Enrollment> {
     const { studentId, courseId } = createEnrollmentDto;
 
-    const student = this.studentsService.findOne(studentId);
+    const student = await this.studentsService.findOne(studentId);
 
-    const course = this.coursesService.findOne(courseId);
+    const course = await this.coursesService.findOne(courseId);
     if (!course) {
       throw new NotFoundException(`No existe un curso con el ID ${courseId}`);
     }
 
     if (!student.isActive) {
-      throw new BadRequestException(
-        'No se puede matricular a un estudiante inactivo',
-      );
+      throw new BadRequestException('El estudiante está inactivo');
     }
 
     const alreadyEnrolled = this.enrollments.some(
@@ -73,15 +71,15 @@ export class EnrollmentsService {
     });
   }
 
-  findByStudent(studentId: number): Enrollment[] {
-    this.studentsService.findOne(studentId);
+  async findByStudent(studentId: number): Promise<Enrollment[]> {
+    await this.studentsService.findOne(studentId);
     return this.enrollments.filter(
       (enrollment) => enrollment.studentId === studentId,
     );
   }
 
-  findByCourse(courseId: number): Enrollment[] {
-    const course = this.coursesService.findOne(courseId);
+  async findByCourse(courseId: number): Promise<Enrollment[]> {
+    const course = await this.coursesService.findOne(courseId);
     if (!course) {
       throw new NotFoundException(`No existe un curso con el ID ${courseId}`);
     }
