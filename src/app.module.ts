@@ -7,6 +7,7 @@ import { StudentsModule } from './students/students.module';
 
 import { Course } from './courses/entities/course.entity';
 import { Student } from './students/entities/student.entity';
+import { EnrollmentsModule } from './enrollments/enrollments.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { Student } from './students/entities/student.entity';
 
     CoursesModule,
     StudentsModule,
+    EnrollmentsModule,
   ],
 })
 export class AppModule {}
