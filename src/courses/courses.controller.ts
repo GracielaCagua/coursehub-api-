@@ -1,36 +1,48 @@
-import { Controller,Get,  Param, Post,Patch , Body,Delete, Query } from '@nestjs/common';
-import { CoursesService} from './courses.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/cretae-course.dto';
-
+import { CoursesQueryDto } from './dto/courses-query.dto';
 
 @Controller('courses')
 export class CoursesController {
-    constructor(private readonly CoursesService: CoursesService) {}
+  constructor(private readonly coursesService: CoursesService) {}
 
-    @Get()
-    findAll(@Query('level') level?: string) {
-        return this.CoursesService.findAll(level);
-         }
-    @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.CoursesService.findOne(Number(id));
+  // El controlador solo recibe el DTO validado y lo pasa al servicio
+  @Get()
+  findAll(@Query() query: CoursesQueryDto) {
+    return this.coursesService.findAll(query);
   }
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.coursesService.findOne(id);
+  }
+
   @Post()
-  create(@Body()  createCourseDto: CreateCourseDto) {
-    return this.CoursesService.create(createCourseDto);
+  create(@Body() createCourseDto: CreateCourseDto) {
+    return this.coursesService.create(createCourseDto);
   }
-   @Patch(':id')
+
+  @Patch(':id')
   update(
-    @Param('id') id: string,
-    @Body() body: { title?: string; level?: string },
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { title?: string; level?: string; isPublished?: boolean },
   ) {
-    return this.CoursesService.update(Number(id), body);
+    return this.coursesService.update(id, body);
   }
+
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.CoursesService.remove(Number(id));
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.coursesService.remove(id);
   }
-  
-
 }
-

@@ -123,3 +123,19 @@ DELETE /enrollments/1
 - Se unificó la rama `practica` (gestión de Estudiantes) sobre `main` (Cursos) mediante `git merge`.
 - Se registraron `CoursesModule`, `StudentsModule` y `EnrollmentsModule` en `AppModule`.
 - Se creó `EnrollmentsModule` con `EnrollmentsController` y `EnrollmentsService`, manteniendo el controlador libre de reglas de negocio.
+
+## Sesión 11 · Filtros, paginación y ordenamiento
+
+`GET /courses` acepta: `level`, `isPublished`, `page` (≥1, por defecto 1), `limit` (1–50, por defecto 10), `sortBy` (`id` | `title` | `level`) y `order` (`ASC` | `DESC`).
+
+```http
+GET /courses?page=1&limit=3&sortBy=title&order=asc
+```
+```json
+{
+  "items": [ { "id": 3, "title": "Arquitectura NestJS", "level": "intermediate", "isPublished": true } ],
+  "meta": { "total": 9, "page": 1, "limit": 3, "totalPages": 3, "nextPage": 2, "previousPage": null }
+}
+```
+
+Los parámetros inválidos responden 400 sin llegar al repositorio.

@@ -1,8 +1,9 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { Course } from './entities/course.entity';
 import { CreateCourseDto } from './dto/cretae-course.dto';
+import { CoursesQueryDto } from './dto/courses-query.dto';
 
 @Injectable()
 export class CoursesService {
@@ -11,11 +12,35 @@ export class CoursesService {
     private readonly coursesRepository: Repository<Course>,
   ) {}
 
-  findAll(level?: string): Promise<Course[]> {
-    return this.coursesRepository.find({
-      where: level ? { level } : {},
-      order: { id: 'ASC' },
+  // Sesión 11: filtro + paginación + ordenamiento en la base de datos
+  async findAll(query: CoursesQueryDto) {
+    const { level, isPublished, page, limit, sortBy, order } = query;
+
+    const where: FindOptionsWhere<Course> = {};
+    if (level) where.level = level;
+    if (isPublished !== undefined) where.isPublished = isPublished;
+
+    const [items, total] = await this.coursesRepository.findAndCount({
+      where,
+      // Desempate por id para que el orden sea estable entre páginas
+      order: sortBy === 'id' ? { id: order } : { [sortBy]: order, id: 'ASC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        nextPage: page < totalPages ? page + 1 : null,
+        previousPage: page > 1 ? page - 1 : null,
+      },
+    };
   }
 
   async findOne(id: number): Promise<Course> {
@@ -31,7 +56,10 @@ export class CoursesService {
     return this.coursesRepository.save(course);
   }
 
-  async update(id: number, input: { title?: string; level?: string }): Promise<Course> {
+  async update(
+    id: number,
+    input: { title?: string; level?: string; isPublished?: boolean },
+  ): Promise<Course> {
     const course = await this.findOne(id);
     Object.assign(course, input);
     return this.coursesRepository.save(course);

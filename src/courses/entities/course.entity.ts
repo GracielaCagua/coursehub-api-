@@ -12,6 +12,9 @@ export class Course {
   @Column()
   level: string;
 
+  @Column({ default: true })
+  isPublished: boolean;
+
   @OneToMany(() => Enrollment, (enrollment) => enrollment.course)
   enrollments: Enrollment[];
 }
