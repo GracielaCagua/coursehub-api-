@@ -9,6 +9,8 @@ import { Course } from './courses/entities/course.entity';
 import { Student } from './students/entities/student.entity';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 
+import { Enrollment } from './enrollments/entities/enrollment.entity';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -26,7 +28,7 @@ import { EnrollmentsModule } from './enrollments/enrollments.module';
         password: config.getOrThrow<string>('DATABASE_PASSWORD'),
         database: config.getOrThrow<string>('DATABASE_NAME'),
 
-        entities: [Course, Student],
+        entities: [Course, Student, Enrollment],
 
         synchronize: true,
       }),

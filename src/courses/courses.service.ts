@@ -1,65 +1,49 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Course } from './entities/course.entity';
 import { CreateCourseDto } from './dto/cretae-course.dto';
-
-type Course = {
-  id: number;
-  title: string;
-  level: string;
-};
- 
-type CreateCourseInput = {
-  title: string;
-  level: string;
-}
-
-type UpdateCourseInput = {
-  title?: string;
-  level?: string;
-}
 
 @Injectable()
 export class CoursesService {
-  private nextId = 4;
-  private readonly courses: Course[] = [
-    { id: 1, title: 'NestJS Fundamentals', level: 'beginner' },
-    { id: 2, title: 'REST APIs with NestJS', level: 'beginner' },
-    { id: 3, title: 'NestJS Architecture', level: 'intermediate' },
-  ];
+  constructor(
+    @InjectRepository(Course)
+    private readonly coursesRepository: Repository<Course>,
+  ) {}
 
-  findAll(level?: string): Course[] {
-    if (!level) {
-      return this.courses;
-    }
-
-    return this.courses.filter((course) => course.level === level);
+  findAll(level?: string): Promise<Course[]> {
+    return this.coursesRepository.find({
+      where: level ? { level } : {},
+      order: { id: 'ASC' },
+    });
   }
 
-  findOne(id: number): Course | undefined {
-    return this.courses.find((course) => course.id === id);
-  }
-
-  create(createCourseDto: CreateCourseDto): Course {
-  const course = { id: this.nextId++, ...createCourseDto };
-  this.courses.push(course);
-  return course;
-}
-  update(id: number, input: UpdateCourseInput): Course | undefined {
-    const course = this.findOne(id);
-
+  async findOne(id: number): Promise<Course> {
+    const course = await this.coursesRepository.findOne({ where: { id } });
     if (!course) {
-      return undefined;
+      throw new NotFoundException(`No existe un curso con el ID ${id}`);
     }
-    Object.assign(course, input);
     return course;
   }
-  remove(id: number): Course | undefined {
-    const index = this.courses.findIndex((course) => course.id === id);
 
-    if (index === -1) {
-      return undefined;
+  create(createCourseDto: CreateCourseDto): Promise<Course> {
+    const course = this.coursesRepository.create(createCourseDto);
+    return this.coursesRepository.save(course);
+  }
+
+  async update(id: number, input: { title?: string; level?: string }): Promise<Course> {
+    const course = await this.findOne(id);
+    Object.assign(course, input);
+    return this.coursesRepository.save(course);
+  }
+
+  async remove(id: number): Promise<Course> {
+    const course = await this.findOne(id);
+    try {
+      await this.coursesRepository.remove(course);
+    } catch {
+      throw new ConflictException('No se puede eliminar un curso que tiene matrículas');
     }
-    const [removedCourse] = this.courses.splice(index, 1);
-    return removedCourse;}
-
-
+    return { ...course, id };
+  }
 }
