@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
+import { FilterEnrollmentDto } from './dto/filter-enrollment.dto';
 import { Enrollment } from './entities/enrollment.entity';
 import { Student } from '../students/entities/student.entity';
 import { Course } from '../courses/entities/course.entity';
@@ -50,15 +51,44 @@ export class EnrollmentsService {
     return this.enrollmentsRepository.save(enrollment);
   }
 
-  findAll(studentId?: number, courseId?: number): Promise<Enrollment[]> {
-    return this.enrollmentsRepository.find({
-      where: {
-        ...(studentId ? { student: { id: studentId } } : {}),
-        ...(courseId ? { course: { id: courseId } } : {}),
-      },
-      relations: { student: true, course: true },
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
+  // Sesión 12: búsqueda y filtros combinables con QueryBuilder
+  async findAll(filters: FilterEnrollmentDto) {
+    const { search, studentId, courseId, onlyActive, page, limit } = filters;
+
+    const qb = this.enrollmentsRepository
+      .createQueryBuilder('enrollment')
+      .leftJoinAndSelect('enrollment.student', 'student')
+      .leftJoinAndSelect('enrollment.course', 'course');
+
+    // Cada filtro se agrega solo si el cliente lo envía, siempre con parámetros
+    if (search?.trim()) {
+      qb.andWhere(
+        '(student.name ILIKE :term OR student.email ILIKE :term OR course.title ILIKE :term)',
+        { term: `%${search.trim()}%` },
+      );
+    }
+    if (studentId !== undefined) {
+      qb.andWhere('student.id = :studentId', { studentId });
+    }
+    if (courseId !== undefined) {
+      qb.andWhere('course.id = :courseId', { courseId });
+    }
+    if (onlyActive) {
+      qb.andWhere('student.isActive = :active', { active: true });
+    }
+
+    // Orden estable y paginación
+    qb.orderBy('enrollment.createdAt', 'DESC')
+      .addOrderBy('enrollment.id', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [items, total] = await qb.getManyAndCount();
+
+    return {
+      items,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async remove(id: number): Promise<Enrollment> {

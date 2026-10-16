@@ -8,7 +8,6 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-
 import { EnrollmentsService } from './enrollments.service';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 import { FilterEnrollmentDto } from './dto/filter-enrollment.dto';
@@ -24,7 +23,7 @@ export class EnrollmentsController {
 
   @Get()
   findAll(@Query() filters: FilterEnrollmentDto) {
-    return this.enrollmentsService.findAll(filters.studentId, filters.courseId);
+    return this.enrollmentsService.findAll(filters);
   }
 
   @Delete(':id')
