@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as Joi from 'joi';
@@ -6,10 +6,6 @@ import * as Joi from 'joi';
 import { CoursesModule } from './courses/courses.module';
 import { StudentsModule } from './students/students.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
-
-import { Course } from './courses/entities/course.entity';
-import { Student } from './students/entities/student.entity';
-import { Enrollment } from './enrollments/entities/enrollment.entity';
 
 @Module({
   imports: [
@@ -32,18 +28,30 @@ import { Enrollment } from './enrollments/entities/enrollment.entity';
       }),
     }),
 
+    // Sesión 14: TypeORM configurado según el ambiente
     TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.getOrThrow<string>('DB_HOST'),
-        port: config.getOrThrow<number>('DB_PORT'),
-        username: config.getOrThrow<string>('DB_USER'),
-        password: config.getOrThrow<string>('DB_PASSWORD'),
-        database: config.getOrThrow<string>('DB_NAME'),
-        entities: [Course, Student, Enrollment],
-        synchronize: true,
-      }),
+      useFactory: (config: ConfigService) => {
+        const nodeEnv = config.getOrThrow<string>('NODE_ENV');
+        const synchronize = nodeEnv === 'development';
+
+        // Registro NO sensible: nunca se imprime la contraseña ni el objeto completo
+        new Logger('Database').log(
+          `Ambiente: ${nodeEnv} | synchronize: ${synchronize}`,
+        );
+
+        return {
+          type: 'postgres' as const,
+          host: config.getOrThrow<string>('DB_HOST'),
+          port: config.getOrThrow<number>('DB_PORT'),
+          username: config.getOrThrow<string>('DB_USER'),
+          password: config.getOrThrow<string>('DB_PASSWORD'),
+          database: config.getOrThrow<string>('DB_NAME'),
+          autoLoadEntities: true,
+          synchronize,
+        };
+      },
     }),
 
     CoursesModule,
