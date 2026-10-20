@@ -204,3 +204,29 @@ export class AddCreditsToCourses1729200000000 implements MigrationInterface {
 }
 ```
 `up` agrega la columna `credits` a la tabla de cursos y `down` la elimina para revertir el cambio. No se ejecuta en esta etapa.
+---
+
+## Etapa 3 · Semana 8 · Cuentas y autenticación inicial
+
+### Endpoints de acceso
+
+| Método | Ruta | Éxito | Errores |
+|---|---|---|---|
+| POST | `/auth/register` | 201 `{ id, email, createdAt }` | 400 cuerpo inválido · 409 correo ya registrado |
+| POST | `/auth/login` | 200 `{ id, email, createdAt }` | 400 cuerpo inválido · 401 `Invalid credentials` |
+
+Ambas rutas reciben `{ "email": string, "password": string }`. El correo se recorta y pasa a minúsculas; la contraseña debe tener entre 8 y 72 caracteres (bcrypt solo usa los primeros 72 bytes).
+
+### Decisiones de seguridad
+
+- La contraseña se guarda solo como hash `bcrypt` (costo 12) en la columna `password_hash`.
+- `passwordHash` tiene `select: false`: solo `UsersService.findByEmailWithPassword`, usado por el login, lo carga.
+- Las respuestas se arman con `id`, `email` y `createdAt`; nunca se devuelve la entidad completa.
+- El login usa `bcrypt.compare`. Correo inexistente y contraseña incorrecta devuelven el mismo 401 para no revelar qué cuentas existen.
+- `users.email` tiene restricción `UNIQUE`. Si dos registros simultáneos pasan la comprobación previa, el error `23505` de PostgreSQL se traduce a 409 sin exponer detalles del motor.
+- `AuthModule` coordina el acceso y `UsersModule` administra la persistencia. `User` se mantiene separado de `Student`.
+- Todavía no hay JWT, guards ni roles: se agregan en las semanas 9 y 10.
+
+### Demostración
+
+El archivo [`requests/auth.http`](requests/auth.http) contiene la secuencia de demostración. Usa solo cuentas de práctica con contraseñas inventadas.

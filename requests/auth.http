@@ -1,0 +1,44 @@
+# Secuencia de demostración · Etapa 3 · Semana 8
+# Solo cuentas de práctica: no uses contraseñas reales en este archivo.
+@baseUrl = http://localhost:3000
+@email = demo.semana8@example.com
+@password = aprendo-nest-2026
+
+### 1. Registro válido → 201, sin hash en la respuesta
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+### 2. Columna del hash: revisar en la base local (no copiar el hash a la evidencia)
+# SELECT id, email, left(password_hash, 7) AS prefijo, length(password_hash) AS largo FROM users;
+
+### 3. Mismo correo con otras mayúsculas → 409
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{ "email": "Demo.Semana8@EXAMPLE.com", "password": "{{password}}" }
+
+### 4. Login correcto → 200
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+### 5a. Contraseña incorrecta → 401 Invalid credentials
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "clave-equivocada" }
+
+### 5b. Correo inexistente → el mismo 401
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "no-existe@example.com", "password": "{{password}}" }
+
+### 6. Cuerpo inválido → 400 antes de consultar la base
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "ana-at-example.com", "password": "corta" }
