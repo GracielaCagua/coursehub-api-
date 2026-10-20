@@ -14,6 +14,15 @@ export class UsersService {
     return this.usersRepository.findOneBy({ email });
   }
 
+  // Uso exclusivo del flujo de login: es la única consulta que carga el hash
+  async findByEmailWithPassword(email: string): Promise<User | null> {
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.email = :email', { email })
+      .getOne();
+  }
+
   async create(email: string, passwordHash: string): Promise<User> {
     const existing = await this.findByEmail(email);
     if (existing) throw new ConflictException('Email already registered');
