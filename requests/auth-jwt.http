@@ -1,0 +1,52 @@
+# Demo account: register it first with requests/auth.http, or set existing practice credentials here.
+@baseUrl = http://localhost:3000
+@email = demo.semana8@example.com
+@password = aprendo-nest-2026
+@accessToken = {{loginPractica.response.body.$.accessToken}}
+@studentId = 1
+@courseId = 1
+
+### Login válido; el token se reutiliza desde la respuesta del cliente HTTP
+# @name loginPractica
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+### Estado de la combinación antes de probar POST /enrollments
+GET {{baseUrl}}/enrollments?studentId={{studentId}}&courseId={{courseId}}
+
+### GET /auth/me con Bearer válido → 200; muestra únicamente id y email
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken}}
+
+### GET /auth/me sin encabezado → 401
+GET {{baseUrl}}/auth/me
+
+### GET /auth/me con token alterado → 401
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken}}-alterado
+
+### Crear matrícula sin token → 401; no debe insertar ni modificar datos
+POST {{baseUrl}}/enrollments
+Content-Type: application/json
+
+{ "studentId": {{studentId}}, "courseId": {{courseId}} }
+
+### DTO inválido con token válido → 400; no debe llamar a las reglas de negocio
+POST {{baseUrl}}/enrollments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "studentId": 0, "courseId": {{courseId}} }
+
+### Matrícula con token válido → aplica existencia, estado activo y duplicados
+# Usa IDs de práctica existentes. Una combinación ya matriculada debe responder 409.
+POST {{baseUrl}}/enrollments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "studentId": {{studentId}}, "courseId": {{courseId}} }
+
+### Compara el estado posterior con la consulta inicial; una respuesta 409 no crea otra matrícula
+GET {{baseUrl}}/enrollments?studentId={{studentId}}&courseId={{courseId}}

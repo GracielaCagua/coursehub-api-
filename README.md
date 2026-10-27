@@ -176,6 +176,8 @@ Los parámetros inválidos responden 400 sin llegar al repositorio.
 | `DB_NAME` | Sí | — | Nombre de la base de datos |
 | `DB_USER` | Sí | — | Usuario de PostgreSQL |
 | `DB_PASSWORD` | Sí | — | Contraseña de PostgreSQL |
+| `JWT_SECRET` | Sí | — | Secreto aleatorio de al menos 32 caracteres; no se comparte |
+| `JWT_EXPIRES_IN` | No | `15m` | Duración del token de acceso |
 
 Las variables se validan con Joi al iniciar. Si falta una obligatoria o tiene un valor inválido, la API no arranca e indica cuál es.
 
@@ -213,9 +215,11 @@ export class AddCreditsToCourses1729200000000 implements MigrationInterface {
 | Método | Ruta | Éxito | Errores |
 |---|---|---|---|
 | POST | `/auth/register` | 201 `{ id, email, createdAt }` | 400 cuerpo inválido · 409 correo ya registrado |
-| POST | `/auth/login` | 200 `{ id, email, createdAt }` | 400 cuerpo inválido · 401 `Invalid credentials` |
+| POST | `/auth/login` | 200 `{ accessToken, user: { id, email, createdAt } }` | 400 cuerpo inválido · 401 `Invalid credentials` |
+| GET | `/auth/me` | 200 `{ id, email }` con JWT Bearer válido | 401 token ausente, inválido o expirado |
 
 Ambas rutas reciben `{ "email": string, "password": string }`. El correo se recorta y pasa a minúsculas; la contraseña debe tener entre 8 y 72 caracteres (bcrypt solo usa los primeros 72 bytes).
+`POST /enrollments` también requiere un JWT Bearer. Las rutas de lectura y cancelación de matrículas no se protegen en esta etapa.
 
 ### Decisiones de seguridad
 
@@ -223,10 +227,23 @@ Ambas rutas reciben `{ "email": string, "password": string }`. El correo se reco
 - `passwordHash` tiene `select: false`: solo `UsersService.findByEmailWithPassword`, usado por el login, lo carga.
 - Las respuestas se arman con `id`, `email` y `createdAt`; nunca se devuelve la entidad completa.
 - El login usa `bcrypt.compare`. Correo inexistente y contraseña incorrecta devuelven el mismo 401 para no revelar qué cuentas existen.
+- Después de validar las credenciales, el login emite un JWT de acceso con `sub` y `email`; el payload no contiene el hash ni la contraseña.
+- `JWT_SECRET` (mínimo 32 caracteres) y `JWT_EXPIRES_IN` (por defecto `15m`) se configuran mediante variables de entorno. Genera un secreto aleatorio para el `.env` local; no uses el valor de ejemplo ni lo subas a Git. El JWT está firmado, no cifrado: su payload se puede leer.
+- `GET /auth/me` valida el JWT Bearer y devuelve la identidad del token. `POST /enrollments` requiere autenticación; mantiene la validación del DTO y las reglas de existencia, estado activo y matrícula duplicada.
 - `users.email` tiene restricción `UNIQUE`. Si dos registros simultáneos pasan la comprobación previa, el error `23505` de PostgreSQL se traduce a 409 sin exponer detalles del motor.
 - `AuthModule` coordina el acceso y `UsersModule` administra la persistencia. `User` se mantiene separado de `Student`.
-- Todavía no hay JWT, guards ni roles: se agregan en las semanas 9 y 10.
+- Todavía no hay autorización por roles: se agrega en la semana 10.
 
 ### Demostración
 
-El archivo [`requests/auth.http`](requests/auth.http) contiene la secuencia de demostración. Usa solo cuentas de práctica con contraseñas inventadas.
+Para demostrar el flujo de JWT (Sesión 17):
+
+1. Inicia la API con `npm run start:dev`; no imprimas ni compartas el contenido de `.env`.
+2. Señala en `.env.example` los nombres `JWT_SECRET` y `JWT_EXPIRES_IN`. El primero debe tener al menos 32 caracteres y el segundo usa `15m` por defecto. Los valores reales se mantienen en el entorno local.
+3. Registra una cuenta de práctica o utiliza una cuenta existente mediante [`requests/auth.http`](requests/auth.http).
+4. Haz login. Explica que la respuesta contiene `accessToken` y un `user` sin contraseña ni hash. El payload JWT transporta `sub`, `email`, `iat` y `exp`; está firmado, no cifrado. No incluyas el token completo en capturas o evidencia pública.
+5. Ejecuta el login nombrado al inicio de [`requests/auth-jwt.http`](requests/auth-jwt.http). El cliente HTTP reutiliza su respuesta localmente en las solicitudes siguientes. Ejecuta `GET /auth/me`: debe responder 200 con la identidad.
+6. Ejecuta las solicitudes sin encabezado y con el token alterado: ambas deben responder 401.
+7. Elige un estudiante y curso de práctica ya matriculados. Consulta su matrícula, intenta repetir `POST /enrollments` sin token (401), y vuelve a consultar para verificar que no cambió. Con token válido, un cuerpo DTO inválido responde 400; la combinación duplicada responde 409. Esto comprueba que la autenticación no omite los DTOs ni las reglas de negocio y que el intento rechazado no duplica datos.
+
+Usa solo cuentas y datos de práctica. El token puede aparecer en la respuesta del login del cliente HTTP; no lo muestres completo en evidencia pública ni lo copies al archivo.

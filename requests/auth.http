@@ -19,7 +19,7 @@ Content-Type: application/json
 
 { "email": "Demo.Semana8@EXAMPLE.com", "password": "{{password}}" }
 
-### 4. Login correcto → 200
+### 4. Login correcto → 200 con token de acceso y usuario sin hash
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 

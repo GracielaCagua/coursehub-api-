@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: baa6f5dc-5988-4938-8db4-7fd08f620fbc
+
+localResources:
+  collections:
+    - ../thunder/semana8-auth.collection.json
