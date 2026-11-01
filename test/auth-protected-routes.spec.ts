@@ -6,48 +6,55 @@ import {
   it,
   jest,
 } from '@jest/globals';
-import {
-  ConflictException,
-  ValidationPipe,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { ConflictException, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AuthController } from '../src/auth/auth.controller';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { AuthService } from '../src/auth/auth.service';
+import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
 import { EnrollmentsController } from '../src/enrollments/enrollments.controller';
 import { EnrollmentsService } from '../src/enrollments/enrollments.service';
 
+const JWT_SECRET = 'test-secret-with-at-least-thirty-two-characters';
+
 describe('JWT protected routes', () => {
   let app: INestApplication;
+  let jwtService: JwtService;
+  let validToken: string;
   const enrollmentsService = {
     create: jest.fn(),
-  };
-  const jwtService = {
-    verifyAsync: jest.fn(async (token: string) => {
-      if (token === 'valid-token') {
-        return { sub: 1, email: 'demo@example.com' };
-      }
-
-      const error = new Error('Invalid token');
-      error.name = 'JsonWebTokenError';
-      throw error;
-    }),
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     const moduleRef = await Test.createTestingModule({
+      imports: [
+        PassportModule.register({ session: false }),
+        JwtModule.register({ secret: JWT_SECRET }),
+      ],
       controllers: [AuthController, EnrollmentsController],
       providers: [
         JwtAuthGuard,
-        { provide: JwtService, useValue: jwtService },
+        JwtStrategy,
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: () => JWT_SECRET },
+        },
         { provide: AuthService, useValue: {} },
         { provide: EnrollmentsService, useValue: enrollmentsService },
       ],
     }).compile();
+
+    jwtService = moduleRef.get(JwtService);
+    validToken = await jwtService.signAsync({
+      sub: 1,
+      email: 'demo@example.com',
+    });
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(
@@ -64,19 +71,41 @@ describe('JWT protected routes', () => {
     await app.close();
   });
 
-  it('returns the authenticated identity from GET /auth/me', async () => {
+  it('returns only the authenticated identity from GET /auth/me', async () => {
     await request(app.getHttpServer())
       .get('/auth/me')
-      .set('Authorization', 'Bearer valid-token')
+      .set('Authorization', `Bearer ${validToken}`)
       .expect(200)
       .expect({ id: 1, email: 'demo@example.com' });
   });
 
-  it('rejects missing and altered tokens on GET /auth/me', async () => {
+  it('rejects missing, malformed, altered, expired, and invalid-payload tokens', async () => {
+    const alteredToken = `${validToken.slice(0, -1)}${validToken.endsWith('a') ? 'b' : 'a'}`;
+    const expiredToken = await jwtService.signAsync(
+      { sub: 1, email: 'demo@example.com' },
+      { expiresIn: -1 },
+    );
+    const invalidPayloadToken = await jwtService.signAsync({
+      sub: '1',
+      email: 'demo@example.com',
+    });
+
     await request(app.getHttpServer()).get('/auth/me').expect(401);
     await request(app.getHttpServer())
       .get('/auth/me')
-      .set('Authorization', 'Bearer altered-token')
+      .set('Authorization', `Token ${validToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${alteredToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${expiredToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${invalidPayloadToken}`)
       .expect(401);
   });
 
@@ -92,7 +121,7 @@ describe('JWT protected routes', () => {
   it('continues validating the enrollment DTO for authenticated requests', async () => {
     await request(app.getHttpServer())
       .post('/enrollments')
-      .set('Authorization', 'Bearer valid-token')
+      .set('Authorization', `Bearer ${validToken}`)
       .send({ studentId: 0, courseId: 1 })
       .expect(400);
 
@@ -101,12 +130,14 @@ describe('JWT protected routes', () => {
 
   it('preserves enrollment business-rule errors for authenticated requests', async () => {
     enrollmentsService.create.mockRejectedValueOnce(
-      new ConflictException('El estudiante ya se encuentra matriculado en este curso'),
+      new ConflictException(
+        'El estudiante ya se encuentra matriculado en este curso',
+      ),
     );
 
     await request(app.getHttpServer())
       .post('/enrollments')
-      .set('Authorization', 'Bearer valid-token')
+      .set('Authorization', `Bearer ${validToken}`)
       .send({ studentId: 1, courseId: 1 })
       .expect(409);
 

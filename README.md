@@ -4,28 +4,29 @@ API construida con NestJS que administra **Cursos**, **Estudiantes** y **Matríc
 
 ### Endpoints
 
-| Módulo | Método | Ruta | Descripción |
-|---|---|---|---|
-| Cursos | GET | `/courses` | Lista cursos, filtro opcional `?level=` |
-| Cursos | GET | `/courses/:id` | Obtiene un curso por id |
-| Cursos | POST | `/courses` | Crea un curso |
-| Cursos | PATCH | `/courses/:id` | Actualiza un curso |
-| Cursos | DELETE | `/courses/:id` | Elimina un curso |
-| Estudiantes | POST | `/students` | Crea un estudiante |
-| Estudiantes | GET | `/students` | Lista estudiantes, filtros combinables `?career=&semester=&isActive=` |
-| Estudiantes | GET | `/students/:id` | Obtiene un estudiante por id |
-| Estudiantes | PATCH | `/students/:id` | Actualiza un estudiante |
-| Estudiantes | DELETE | `/students/:id` | Elimina un estudiante (solo si está activo) |
-| Estudiantes | PATCH | `/students/:id/status` | Cambia el estado activo/inactivo |
-| Matrículas | POST | `/enrollments` | Registra una matrícula |
-| Matrículas | GET | `/enrollments` | Lista matrículas, filtros combinables `?studentId=&courseId=` |
-| Matrículas | GET | `/students/:studentId/enrollments` | Matrículas de un estudiante |
-| Matrículas | GET | `/courses/:courseId/enrollments` | Matrículas de un curso |
-| Matrículas | DELETE | `/enrollments/:id` | Cancela una matrícula |
+| Módulo      | Método | Ruta                               | Descripción                                                           |
+| ----------- | ------ | ---------------------------------- | --------------------------------------------------------------------- |
+| Cursos      | GET    | `/courses`                         | Lista cursos, filtro opcional `?level=`                               |
+| Cursos      | GET    | `/courses/:id`                     | Obtiene un curso por id                                               |
+| Cursos      | POST   | `/courses`                         | Crea un curso                                                         |
+| Cursos      | PATCH  | `/courses/:id`                     | Actualiza un curso                                                    |
+| Cursos      | DELETE | `/courses/:id`                     | Elimina un curso                                                      |
+| Estudiantes | POST   | `/students`                        | Crea un estudiante                                                    |
+| Estudiantes | GET    | `/students`                        | Lista estudiantes, filtros combinables `?career=&semester=&isActive=` |
+| Estudiantes | GET    | `/students/:id`                    | Obtiene un estudiante por id                                          |
+| Estudiantes | PATCH  | `/students/:id`                    | Actualiza un estudiante                                               |
+| Estudiantes | DELETE | `/students/:id`                    | Elimina un estudiante (solo si está activo)                           |
+| Estudiantes | PATCH  | `/students/:id/status`             | Cambia el estado activo/inactivo                                      |
+| Matrículas  | POST   | `/enrollments`                     | Registra una matrícula                                                |
+| Matrículas  | GET    | `/enrollments`                     | Lista matrículas, filtros combinables `?studentId=&courseId=`         |
+| Matrículas  | GET    | `/students/:studentId/enrollments` | Matrículas de un estudiante                                           |
+| Matrículas  | GET    | `/courses/:courseId/enrollments`   | Matrículas de un curso                                                |
+| Matrículas  | DELETE | `/enrollments/:id`                 | Cancela una matrícula                                                 |
 
 ### Reglas de negocio de Matrículas
 
 Antes de registrar una matrícula (`POST /enrollments`), el servicio valida en orden:
+
 1. Que el **estudiante exista** (404 si no).
 2. Que el **curso exista** (404 si no).
 3. Que el **estudiante esté activo** (400 si está inactivo).
@@ -34,22 +35,26 @@ Antes de registrar una matrícula (`POST /enrollments`), el servicio valida en o
 ### Ejemplos de request / response
 
 **Matrícula válida**
+
 ```http
 POST /enrollments
 Content-Type: application/json
 
 { "studentId": 1, "courseId": 1 }
 ```
+
 ```json
 // 201 Created
 { "id": 1, "studentId": 1, "courseId": 1 }
 ```
 
 **Matrícula duplicada**
+
 ```http
 POST /enrollments
 { "studentId": 1, "courseId": 1 }
 ```
+
 ```json
 // 409 Conflict
 {
@@ -60,10 +65,12 @@ POST /enrollments
 ```
 
 **Estudiante inactivo**
+
 ```http
 POST /enrollments
 { "studentId": 2, "courseId": 1 }
 ```
+
 ```json
 // 400 Bad Request
 {
@@ -74,10 +81,12 @@ POST /enrollments
 ```
 
 **Curso inexistente**
+
 ```http
 POST /enrollments
 { "studentId": 1, "courseId": 999 }
 ```
+
 ```json
 // 404 Not Found
 {
@@ -88,27 +97,33 @@ POST /enrollments
 ```
 
 **Filtros combinables**
+
 ```http
 GET /enrollments?studentId=1
 ```
+
 ```json
 // 200 OK
-[ { "id": 1, "studentId": 1, "courseId": 1 } ]
+[{ "id": 1, "studentId": 1, "courseId": 1 }]
 ```
 
 **Cancelar una matrícula**
+
 ```http
 DELETE /enrollments/1
 ```
+
 ```json
 // 200 OK
 { "id": 1, "studentId": 1, "courseId": 1 }
 ```
 
 **Cancelar una matrícula inexistente**
+
 ```http
 DELETE /enrollments/1
 ```
+
 ```json
 // 404 Not Found
 {
@@ -131,10 +146,25 @@ DELETE /enrollments/1
 ```http
 GET /courses?page=1&limit=3&sortBy=title&order=asc
 ```
+
 ```json
 {
-  "items": [ { "id": 3, "title": "Arquitectura NestJS", "level": "intermediate", "isPublished": true } ],
-  "meta": { "total": 9, "page": 1, "limit": 3, "totalPages": 3, "nextPage": 2, "previousPage": null }
+  "items": [
+    {
+      "id": 3,
+      "title": "Arquitectura NestJS",
+      "level": "intermediate",
+      "isPublished": true
+    }
+  ],
+  "meta": {
+    "total": 9,
+    "page": 1,
+    "limit": 3,
+    "totalPages": 3,
+    "nextPage": 2,
+    "previousPage": null
+  }
 }
 ```
 
@@ -145,47 +175,54 @@ Los parámetros inválidos responden 400 sin llegar al repositorio.
 ## Instalación y configuración (Semana 7)
 
 ### Requisitos
+
 - Node.js 20 o superior
 - PostgreSQL 14 o superior, con una base de datos llamada `coursehub`
 
 ### Pasos para iniciar
+
 1. Clonar el repositorio e instalar dependencias:
+
 ```bash
    npm install
 ```
+
 2. Copiar la plantilla de variables y completar la contraseña local de PostgreSQL:
+
 ```bash
    cp .env.example .env
 ```
+
 3. Iniciar la API:
+
 ```bash
    npm run start:dev
 ```
 
->  El archivo `.env` contiene credenciales reales y **nunca** debe subirse al repositorio (está en `.gitignore`).
+> El archivo `.env` contiene credenciales reales y **nunca** debe subirse al repositorio (está en `.gitignore`).
 
 ### Variables de entorno
 
-| Variable | Obligatoria | Por defecto | Descripción |
-|---|---|---|---|
-| `NODE_ENV` | No | `development` | `development`, `test` o `production` |
-| `PORT` | No | `3000` | Puerto de la API |
-| `LOG_LEVEL` | No | `log` | `debug`, `log`, `warn` o `error` |
-| `DB_HOST` | Sí | — | Host de PostgreSQL |
-| `DB_PORT` | No | `5432` | Puerto de PostgreSQL |
-| `DB_NAME` | Sí | — | Nombre de la base de datos |
-| `DB_USER` | Sí | — | Usuario de PostgreSQL |
-| `DB_PASSWORD` | Sí | — | Contraseña de PostgreSQL |
-| `JWT_SECRET` | Sí | — | Secreto aleatorio de al menos 32 caracteres; no se comparte |
-| `JWT_EXPIRES_IN` | No | `15m` | Duración del token de acceso |
+| Variable         | Obligatoria | Por defecto   | Descripción                                                 |
+| ---------------- | ----------- | ------------- | ----------------------------------------------------------- |
+| `NODE_ENV`       | No          | `development` | `development`, `test` o `production`                        |
+| `PORT`           | No          | `3000`        | Puerto de la API                                            |
+| `LOG_LEVEL`      | No          | `log`         | `debug`, `log`, `warn` o `error`                            |
+| `DB_HOST`        | Sí          | —             | Host de PostgreSQL                                          |
+| `DB_PORT`        | No          | `5432`        | Puerto de PostgreSQL                                        |
+| `DB_NAME`        | Sí          | —             | Nombre de la base de datos                                  |
+| `DB_USER`        | Sí          | —             | Usuario de PostgreSQL                                       |
+| `DB_PASSWORD`    | Sí          | —             | Contraseña de PostgreSQL                                    |
+| `JWT_SECRET`     | Sí          | —             | Secreto aleatorio de al menos 32 caracteres; no se comparte |
+| `JWT_EXPIRES_IN` | No          | `15m`         | Duración del token de acceso                                |
 
 Las variables se validan con Joi al iniciar. Si falta una obligatoria o tiene un valor inválido, la API no arranca e indica cuál es.
 
 ### Política por ambiente
 
-| Ambiente | `synchronize` |
-|---|---|
-| `development` | `true`: TypeORM crea y actualiza las tablas automáticamente |
+| Ambiente              | `synchronize`                                                               |
+| --------------------- | --------------------------------------------------------------------------- |
+| `development`         | `true`: TypeORM crea y actualiza las tablas automáticamente                 |
 | `test` / `production` | `false`: el esquema no se modifica automáticamente (se usarían migraciones) |
 
 ### Propuesta de migración (tarea opcional)
@@ -205,6 +242,7 @@ export class AddCreditsToCourses1729200000000 implements MigrationInterface {
   }
 }
 ```
+
 `up` agrega la columna `credits` a la tabla de cursos y `down` la elimina para revertir el cambio. No se ejecuta en esta etapa.
 ---
 
@@ -212,14 +250,28 @@ export class AddCreditsToCourses1729200000000 implements MigrationInterface {
 
 ### Endpoints de acceso
 
-| Método | Ruta | Éxito | Errores |
-|---|---|---|---|
-| POST | `/auth/register` | 201 `{ id, email, createdAt }` | 400 cuerpo inválido · 409 correo ya registrado |
-| POST | `/auth/login` | 200 `{ accessToken, user: { id, email, createdAt } }` | 400 cuerpo inválido · 401 `Invalid credentials` |
-| GET | `/auth/me` | 200 `{ id, email }` con JWT Bearer válido | 401 token ausente, inválido o expirado |
+| Método | Ruta             | Éxito                                                 | Errores                                         |
+| ------ | ---------------- | ----------------------------------------------------- | ----------------------------------------------- |
+| POST   | `/auth/register` | 201 `{ id, email, createdAt }`                        | 400 cuerpo inválido · 409 correo ya registrado  |
+| POST   | `/auth/login`    | 200 `{ accessToken, user: { id, email, createdAt } }` | 400 cuerpo inválido · 401 `Invalid credentials` |
+| GET    | `/auth/me`       | 200 `{ id, email }` con JWT Bearer válido             | 401 token ausente, inválido o expirado          |
 
 Ambas rutas reciben `{ "email": string, "password": string }`. El correo se recorta y pasa a minúsculas; la contraseña debe tener entre 8 y 72 caracteres (bcrypt solo usa los primeros 72 bytes).
 `POST /enrollments` también requiere un JWT Bearer. Las rutas de lectura y cancelación de matrículas no se protegen en esta etapa.
+
+## Sesión 18 · Verificación JWT y rutas protegidas
+
+| Método      | Ruta                                                    | Acceso                 |
+| ----------- | ------------------------------------------------------- | ---------------------- |
+| POST        | `/auth/register`                                        | Pública                |
+| POST        | `/auth/login`                                           | Pública                |
+| GET         | `/auth/me`                                              | Requiere JWT Bearer    |
+| POST        | `/enrollments`                                          | Requiere JWT Bearer    |
+| Otras rutas | Cursos, estudiantes y lectura/cancelación de matrículas | Públicas en esta etapa |
+
+`JwtAuthGuard` reutiliza la estrategia `jwt` de Passport. Esta extrae el Bearer del encabezado `Authorization`, verifica la firma y la expiración usando `JWT_SECRET`, y transforma `sub` y `email` en la identidad segura `{ id, email }` disponible en `req.user`. Un encabezado ausente, un esquema incorrecto, un token inválido o expirado, o una carga inválida producen `401`; el método protegido no se ejecuta. Los DTOs y las reglas de negocio siguen aplicándose a las solicitudes autenticadas.
+
+La autenticación confirma la identidad, no los permisos: no se aplican roles ni se responde `403` por autorización en esta etapa.
 
 ### Decisiones de seguridad
 
@@ -245,5 +297,6 @@ Para demostrar el flujo de JWT (Sesión 17):
 5. Ejecuta el login nombrado al inicio de [`requests/auth-jwt.http`](requests/auth-jwt.http). El cliente HTTP reutiliza su respuesta localmente en las solicitudes siguientes. Ejecuta `GET /auth/me`: debe responder 200 con la identidad.
 6. Ejecuta las solicitudes sin encabezado y con el token alterado: ambas deben responder 401.
 7. Elige un estudiante y curso de práctica ya matriculados. Consulta su matrícula, intenta repetir `POST /enrollments` sin token (401), y vuelve a consultar para verificar que no cambió. Con token válido, un cuerpo DTO inválido responde 400; la combinación duplicada responde 409. Esto comprueba que la autenticación no omite los DTOs ni las reglas de negocio y que el intento rechazado no duplica datos.
+8. Revisa la estrategia Passport/JWT y el `JwtAuthGuard` compartido: `GET /auth/me` y `POST /enrollments` son las dos rutas protegidas de la práctica.
 
 Usa solo cuentas y datos de práctica. El token puede aparecer en la respuesta del login del cliente HTTP; no lo muestres completo en evidencia pública ni lo copies al archivo.

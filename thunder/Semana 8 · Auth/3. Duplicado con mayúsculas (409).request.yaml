@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseUrl}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "Demo.Thunder@EXAMPLE.com",
+      "password": "{{password}}"
+    }
+order: 2000

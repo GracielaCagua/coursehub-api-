@@ -13,9 +13,9 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { JwtPayload } from './types/jwt-payload.type';
+import { AuthenticatedUser } from './types/jwt-payload.type';
 
-type AuthenticatedRequest = Request & { user: JwtPayload };
+type AuthenticatedRequest = Request & { user: AuthenticatedUser };
 
 @Controller('auth')
 export class AuthController {
@@ -36,6 +36,6 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@Req() request: AuthenticatedRequest) {
-    return { id: request.user.sub, email: request.user.email };
+    return request.user;
   }
 }
