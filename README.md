@@ -208,6 +208,7 @@ Los parámetros inválidos responden 400 sin llegar al repositorio.
 | `NODE_ENV`       | No          | `development` | `development`, `test` o `production`                        |
 | `PORT`           | No          | `3000`        | Puerto de la API                                            |
 | `LOG_LEVEL`      | No          | `log`         | `debug`, `log`, `warn` o `error`                            |
+| `CORS_ORIGINS`   | No          | `http://localhost:5173` | Orígenes web permitidos, separados por comas |
 | `DB_HOST`        | Sí          | —             | Host de PostgreSQL                                          |
 | `DB_PORT`        | No          | `5432`        | Puerto de PostgreSQL                                        |
 | `DB_NAME`        | Sí          | —             | Nombre de la base de datos                                  |
@@ -324,5 +325,17 @@ UPDATE users SET role = 'student' WHERE email = 'student.practice@example.local'
 Inicia sesión de nuevo después de cambiar roles para obtener tokens actualizados. Configura contraseñas de práctica y `practiceOtherCourseId` (el id de un curso local existente) en el entorno local del cliente HTTP y ejecuta [`requests/roles-permissions.http`](requests/roles-permissions.http). Para probar la eliminación, establece ese id a un curso desechable y sin matrículas. Las claves mínimas para autorizar son `id`, `email` y `role`; `id` y `role` provienen del JWT firmado y el cuerpo no puede declarar propiedad.
 
 En `development`, `synchronize` crea los campos y la relación de propiedad. En `test` y `production`, donde `synchronize` está desactivado, el esquema debe actualizarse mediante una migración antes de desplegar esta versión.
+
+## Sesión 20 · Controles de seguridad para una API pública
+
+La API permite únicamente los orígenes indicados por `CORS_ORIGINS` (separados por comas); por defecto, `http://localhost:5173`. Ajusta ese valor al origen real de tu frontend. Se permiten los métodos `GET`, `POST`, `PATCH`, `DELETE` y `OPTIONS`, y los encabezados `Content-Type` y `Authorization`. No se usa `*`. CORS solo limita qué sitios web pueden leer respuestas desde navegadores: no reemplaza JWT ni roles, y no bloquea solicitudes de Thunder Client, Postman o scripts. Thunder Client no es una herramienta para comprobar CORS desde un navegador.
+
+`ThrottlerGuard` limita el tráfico general a 20 solicitudes por minuto por IP observada por la API; `POST /auth/login` tiene un límite más estricto de 5 por minuto. Al superar el límite, la API responde `429 Too Many Requests` sin indicar si el correo o la contraseña eran correctos. La limitación predeterminada usa memoria del proceso; un despliegue con varias réplicas requiere almacenamiento compartido para aplicar un límite común. Detrás de un proxy, configura explícitamente la confianza del proxy antes de basar los límites en la IP original del cliente.
+
+En local se permite `http://localhost`. En producción todo el tráfico debe usar HTTPS/TLS, normalmente terminado por el proxy o balanceador. JWT, contraseñas y secretos deben transmitirse únicamente por HTTPS; los secretos se configuran en el entorno de despliegue y no se guardan en Git.
+
+Para verificar CORS con la página incluida en [`requests/cors-check.html`](requests/cors-check.html), abre una terminal en la raíz del proyecto y ejecuta `python -m http.server 5173 --directory requests`; abre `http://localhost:5173/cors-check.html` y pulsa el botón, que debe mostrar `HTTP 200`. En otra terminal ejecuta `python -m http.server 5174 --directory requests` y abre la misma página en `http://localhost:5174/cors-check.html`; el navegador debe bloquear la lectura y mostrar el mensaje de error. CORS no impide que la solicitud llegue al servidor. Aun desde el origen permitido, `GET /auth/me` sin Bearer sigue respondiendo `401`.
+
+Ejecuta `npm run test:throttling` para verificar localmente que las primeras cinco solicitudes al login pasan y la sexta devuelve `429`. En Thunder Client, una vez que pase un minuto o reinicies la API, también puedes enviar seis solicitudes `POST /auth/login` seguidas con un cuerpo válido para observar el mismo límite.
 
 Usa solo cuentas y datos de práctica. El token puede aparecer en la respuesta del login del cliente HTTP; no lo muestres completo en evidencia pública ni lo copies al archivo.

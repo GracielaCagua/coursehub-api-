@@ -1,28 +1,50 @@
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  jest,
-} from '@jest/globals';
-import { ConflictException, ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtModule, JwtService } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
-import { Test } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import request from 'supertest';
-import { AuthController } from '../src/auth/auth.controller';
-import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
-import { AuthService } from '../src/auth/auth.service';
-import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
-import { RolesGuard } from '../src/auth/guards/roles.guard';
-import { CoursesController } from '../src/courses/courses.controller';
-import { CoursesService } from '../src/courses/courses.service';
-import { EnrollmentsController } from '../src/enrollments/enrollments.controller';
-import { EnrollmentsService } from '../src/enrollments/enrollments.service';
-import { UserRole } from '../src/users/user-role.enum';
+import { jest } from '@jest/globals';
+import type { INestApplication } from '@nestjs/common';
+
+// Keep Jest's ESM runner isolated from the throttler package's CommonJS entry.
+jest.unstable_mockModule('@nestjs/throttler', () => {
+  class TestThrottlerGuard {
+    canActivate(): boolean {
+      return true;
+    }
+  }
+
+  class TestThrottlerModule {}
+
+  return {
+    Throttle: () => () => undefined,
+    ThrottlerGuard: TestThrottlerGuard,
+    ThrottlerModule: {
+      forRoot: () => ({ module: TestThrottlerModule }),
+    },
+  };
+});
+
+const { afterEach, beforeEach, describe, expect, it } =
+  await import('@jest/globals');
+const { ConflictException, ValidationPipe } = await import('@nestjs/common');
+const { ConfigService } = await import('@nestjs/config');
+const { APP_GUARD } = await import('@nestjs/core');
+const { JwtModule } = await import('@nestjs/jwt');
+const { PassportModule } = await import('@nestjs/passport');
+const { ThrottlerGuard, ThrottlerModule } =
+  await import('@nestjs/throttler');
+const { Test } = await import('@nestjs/testing');
+const { default: request } = await import('supertest');
+const { AuthController } = await import('../src/auth/auth.controller');
+const { AuthService } = await import('../src/auth/auth.service');
+const { JwtAuthGuard } = await import('../src/auth/guards/jwt-auth.guard');
+const { RolesGuard } = await import('../src/auth/guards/roles.guard');
+const { JwtStrategy } = await import('../src/auth/strategies/jwt.strategy');
+const { CoursesController } = await import('../src/courses/courses.controller');
+const { CoursesService } = await import('../src/courses/courses.service');
+const { EnrollmentsController } =
+  await import('../src/enrollments/enrollments.controller');
+const { EnrollmentsService } =
+  await import('../src/enrollments/enrollments.service');
+const { configureCors } = await import('../src/security/cors');
+const { UserRole } = await import('../src/users/user-role.enum');
+const { JwtService } = await import('@nestjs/jwt');
 
 const JWT_SECRET = 'test-secret-with-at-least-thirty-two-characters';
 
@@ -32,6 +54,12 @@ describe('JWT protected routes', () => {
   let validToken: string;
   const enrollmentsService = {
     create: jest.fn(),
+  };
+  const authService = {
+    login: jest.fn().mockResolvedValue({
+      accessToken: 'practice-token',
+      user: { id: 1, email: 'demo@example.com', role: UserRole.STUDENT },
+    }),
   };
   const coursesService = {
     create: jest.fn(),
@@ -45,6 +73,7 @@ describe('JWT protected routes', () => {
       imports: [
         PassportModule.register({ session: false }),
         JwtModule.register({ secret: JWT_SECRET }),
+        ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
       ],
       controllers: [AuthController, EnrollmentsController, CoursesController],
       providers: [
@@ -55,7 +84,8 @@ describe('JWT protected routes', () => {
           provide: ConfigService,
           useValue: { getOrThrow: () => JWT_SECRET },
         },
-        { provide: AuthService, useValue: {} },
+        { provide: APP_GUARD, useClass: ThrottlerGuard },
+        { provide: AuthService, useValue: authService },
         { provide: EnrollmentsService, useValue: enrollmentsService },
         { provide: CoursesService, useValue: coursesService },
       ],
@@ -68,6 +98,7 @@ describe('JWT protected routes', () => {
     });
 
     app = moduleRef.createNestApplication();
+    configureCors(app, 'http://localhost:5173');
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -220,5 +251,34 @@ describe('JWT protected routes', () => {
       { title: 'Updated' },
       { id: 2, email: 'teacher@example.com', role: UserRole.TEACHER },
     );
+  });
+
+  it('allows CORS only from the configured origin without bypassing JWT auth', async () => {
+    const preflight = await request(app.getHttpServer())
+      .options('/auth/me')
+      .set('Origin', 'http://localhost:5173')
+      .set('Access-Control-Request-Method', 'GET')
+      .set('Access-Control-Request-Headers', 'authorization')
+      .expect(204);
+
+    expect(preflight.headers['access-control-allow-origin']).toBe(
+      'http://localhost:5173',
+    );
+
+    const allowedOriginWithoutToken = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Origin', 'http://localhost:5173')
+      .expect(401);
+    expect(
+      allowedOriginWithoutToken.headers['access-control-allow-origin'],
+    ).toBe('http://localhost:5173');
+
+    const disallowedOrigin = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Origin', 'http://localhost:5174')
+      .expect(401);
+    expect(
+      disallowedOrigin.headers['access-control-allow-origin'],
+    ).toBeUndefined();
   });
 });

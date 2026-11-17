@@ -2,7 +2,7 @@ import { LogLevel, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-
+import { configureCors } from './security/cors';
 
 const LEVELS: LogLevel[] = ['error', 'warn', 'log', 'debug'];
 const logLevel = (process.env.LOG_LEVEL ?? 'log') as LogLevel;
@@ -12,6 +12,8 @@ const logger = LEVELS.includes(logLevel)
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { logger });
+  const config = app.get(ConfigService);
+  configureCors(app, config.getOrThrow<string>('CORS_ORIGINS'));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -21,8 +23,6 @@ async function bootstrap() {
     }),
   );
 
-  
-  const config = app.get(ConfigService);
   const port = config.getOrThrow<number>('PORT');
   await app.listen(port);
   console.log(`CourseHub API escuchando en el puerto ${port} (${config.get('NODE_ENV')})`);

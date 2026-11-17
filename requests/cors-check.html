@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CourseHub CORS check</title>
+  </head>
+  <body>
+    <h1>CourseHub CORS check</h1>
+    <button id="check">Request GET /courses</button>
+    <pre id="result">Click the button to test the API origin.</pre>
+    <script>
+      const result = document.querySelector('#result');
+
+      document.querySelector('#check').addEventListener('click', async () => {
+        result.textContent = 'Requesting...';
+        try {
+          const response = await fetch('http://localhost:3000/courses');
+          result.textContent = `HTTP ${response.status}\n${await response.text()}`;
+        } catch {
+          result.textContent =
+            'The browser could not read the response. Check CORS_ORIGINS and the browser console.';
+        }
+      });
+    </script>
+  </body>
+</html>
