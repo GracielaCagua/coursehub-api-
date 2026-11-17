@@ -17,12 +17,21 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = await this.usersService.create(dto.email, passwordHash);
     // Respuesta explícita: nunca se devuelve password ni passwordHash
-    return { id: user.id, email: user.email, createdAt: user.createdAt };
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
   }
 
   async login(dto: LoginDto) {
     const user = await this.validateCredentials(dto.email, dto.password);
-    const payload: JwtPayload = { sub: user.id, email: user.email };
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
 
     return {
       accessToken: await this.jwtService.signAsync(payload),
@@ -45,6 +54,7 @@ export class AuthService {
     return {
       id: foundUser.id,
       email: foundUser.email,
+      role: foundUser.role,
       createdAt: foundUser.createdAt,
     };
   }

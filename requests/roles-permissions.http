@@ -1,0 +1,86 @@
+@baseUrl = http://localhost:3000
+@adminEmail = admin.practice@example.local
+@teacherEmail = teacher.practice@example.local
+@studentEmail = student.practice@example.local
+@adminPassword = {{adminPracticePassword}}
+@teacherPassword = {{teacherPracticePassword}}
+@studentPassword = {{studentPracticePassword}}
+@otherCourseId = {{practiceOtherCourseId}}
+
+### Usa exclusivamente cuentas y contraseñas de práctica configuradas localmente
+# @name loginAdmin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{adminEmail}}", "password": "{{adminPassword}}" }
+
+###
+# @name loginTeacher
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{teacherEmail}}", "password": "{{teacherPassword}}" }
+
+###
+# @name loginStudent
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{studentEmail}}", "password": "{{studentPassword}}" }
+
+### Identidad autenticada con rol → 200
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+
+### Crear curso como docente; se guarda como propietario → 201
+# @name createTeacherCourse
+POST {{baseUrl}}/courses
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "Curso de práctica de roles", "level": "beginner" }
+
+### Sin token → 401
+PATCH {{baseUrl}}/courses/{{otherCourseId}}
+Content-Type: application/json
+
+{ "title": "Intento sin identidad" }
+
+### Estudiante autenticado que intenta modificar → 403
+PATCH {{baseUrl}}/courses/{{otherCourseId}}
+Authorization: Bearer {{loginStudent.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "Intento de estudiante" }
+
+### Docente propietario → 200
+PATCH {{baseUrl}}/courses/{{createTeacherCourse.response.body.$.id}}
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "Curso actualizado por su docente" }
+
+### Docente ajeno → 403
+PATCH {{baseUrl}}/courses/{{otherCourseId}}
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "Intento de docente ajeno" }
+
+### Administrador puede modificar cualquier curso → 200
+PATCH {{baseUrl}}/courses/{{otherCourseId}}
+Authorization: Bearer {{loginAdmin.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "Curso actualizado por administración" }
+
+### Sin token para eliminar → 401
+DELETE {{baseUrl}}/courses/{{otherCourseId}}
+
+### Docente no puede eliminar → 403
+DELETE {{baseUrl}}/courses/{{otherCourseId}}
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+
+### Solo usar con un curso de práctica sin matrículas: admin puede eliminar → 200
+DELETE {{baseUrl}}/courses/{{otherCourseId}}
+Authorization: Bearer {{loginAdmin.response.body.$.accessToken}}

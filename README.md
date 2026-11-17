@@ -8,9 +8,9 @@ API construida con NestJS que administra **Cursos**, **Estudiantes** y **Matríc
 | ----------- | ------ | ---------------------------------- | --------------------------------------------------------------------- |
 | Cursos      | GET    | `/courses`                         | Lista cursos, filtro opcional `?level=`                               |
 | Cursos      | GET    | `/courses/:id`                     | Obtiene un curso por id                                               |
-| Cursos      | POST   | `/courses`                         | Crea un curso                                                         |
-| Cursos      | PATCH  | `/courses/:id`                     | Actualiza un curso                                                    |
-| Cursos      | DELETE | `/courses/:id`                     | Elimina un curso                                                      |
+| Cursos      | POST   | `/courses`                         | Crea un curso (admin o docente autenticado)                           |
+| Cursos      | PATCH  | `/courses/:id`                     | Actualiza el administrador o el docente propietario                   |
+| Cursos      | DELETE | `/courses/:id`                     | Elimina un curso (solo admin autenticado)                             |
 | Estudiantes | POST   | `/students`                        | Crea un estudiante                                                    |
 | Estudiantes | GET    | `/students`                        | Lista estudiantes, filtros combinables `?career=&semester=&isActive=` |
 | Estudiantes | GET    | `/students/:id`                    | Obtiene un estudiante por id                                          |
@@ -252,9 +252,9 @@ export class AddCreditsToCourses1729200000000 implements MigrationInterface {
 
 | Método | Ruta             | Éxito                                                 | Errores                                         |
 | ------ | ---------------- | ----------------------------------------------------- | ----------------------------------------------- |
-| POST   | `/auth/register` | 201 `{ id, email, createdAt }`                        | 400 cuerpo inválido · 409 correo ya registrado  |
-| POST   | `/auth/login`    | 200 `{ accessToken, user: { id, email, createdAt } }` | 400 cuerpo inválido · 401 `Invalid credentials` |
-| GET    | `/auth/me`       | 200 `{ id, email }` con JWT Bearer válido             | 401 token ausente, inválido o expirado          |
+| POST   | `/auth/register` | 201 `{ id, email, role, createdAt }`                             | 400 cuerpo inválido · 409 correo ya registrado  |
+| POST   | `/auth/login`    | 200 `{ accessToken, user: { id, email, role, createdAt } }`     | 400 cuerpo inválido · 401 `Invalid credentials` |
+| GET    | `/auth/me`       | 200 `{ id, email, role }` con JWT Bearer válido                  | 401 token ausente, inválido o expirado          |
 
 Ambas rutas reciben `{ "email": string, "password": string }`. El correo se recorta y pasa a minúsculas; la contraseña debe tener entre 8 y 72 caracteres (bcrypt solo usa los primeros 72 bytes).
 `POST /enrollments` también requiere un JWT Bearer. Las rutas de lectura y cancelación de matrículas no se protegen en esta etapa.
@@ -268,6 +268,8 @@ Ambas rutas reciben `{ "email": string, "password": string }`. El correo se reco
 | GET         | `/auth/me`                                              | Requiere JWT Bearer    |
 | POST        | `/enrollments`                                          | Requiere JWT Bearer    |
 | Otras rutas | Cursos, estudiantes y lectura/cancelación de matrículas | Públicas en esta etapa |
+
+La tabla y las decisiones de esta sección describen el cierre de la Sesión 18; la política vigente de cursos está en la Sesión 19.
 
 `JwtAuthGuard` reutiliza la estrategia `jwt` de Passport. Esta extrae el Bearer del encabezado `Authorization`, verifica la firma y la expiración usando `JWT_SECRET`, y transforma `sub` y `email` en la identidad segura `{ id, email }` disponible en `req.user`. Un encabezado ausente, un esquema incorrecto, un token inválido o expirado, o una carga inválida producen `401`; el método protegido no se ejecuta. Los DTOs y las reglas de negocio siguen aplicándose a las solicitudes autenticadas.
 
@@ -293,10 +295,34 @@ Para demostrar el flujo de JWT (Sesión 17):
 1. Inicia la API con `npm run start:dev`; no imprimas ni compartas el contenido de `.env`.
 2. Señala en `.env.example` los nombres `JWT_SECRET` y `JWT_EXPIRES_IN`. El primero debe tener al menos 32 caracteres y el segundo usa `15m` por defecto. Los valores reales se mantienen en el entorno local.
 3. Registra una cuenta de práctica o utiliza una cuenta existente mediante [`requests/auth.http`](requests/auth.http).
-4. Haz login. Explica que la respuesta contiene `accessToken` y un `user` sin contraseña ni hash. El payload JWT transporta `sub`, `email`, `iat` y `exp`; está firmado, no cifrado. No incluyas el token completo en capturas o evidencia pública.
+4. Haz login. Explica que la respuesta contiene `accessToken` y un `user` sin contraseña ni hash. El payload JWT transporta `sub`, `email`, `role`, `iat` y `exp`; está firmado, no cifrado. No incluyas el token completo en capturas o evidencia pública.
 5. Ejecuta el login nombrado al inicio de [`requests/auth-jwt.http`](requests/auth-jwt.http). El cliente HTTP reutiliza su respuesta localmente en las solicitudes siguientes. Ejecuta `GET /auth/me`: debe responder 200 con la identidad.
 6. Ejecuta las solicitudes sin encabezado y con el token alterado: ambas deben responder 401.
 7. Elige un estudiante y curso de práctica ya matriculados. Consulta su matrícula, intenta repetir `POST /enrollments` sin token (401), y vuelve a consultar para verificar que no cambió. Con token válido, un cuerpo DTO inválido responde 400; la combinación duplicada responde 409. Esto comprueba que la autenticación no omite los DTOs ni las reglas de negocio y que el intento rechazado no duplica datos.
 8. Revisa la estrategia Passport/JWT y el `JwtAuthGuard` compartido: `GET /auth/me` y `POST /enrollments` son las dos rutas protegidas de la práctica.
+
+## Sesión 19 · Roles, permisos y propiedad de cursos
+
+`User.role` usa el enum `admin`, `teacher` o `student` y las cuentas nuevas quedan como `student`. El rol se incluye en el JWT y en `GET /auth/me`; los tokens de sesiones anteriores que no tengan rol se consideran `student`. No se acepta un rol fuera del enum.
+
+| Acción | Regla | Resultado si no cumple |
+| --- | --- | --- |
+| `POST /courses` | Admin o docente; quien crea queda como propietario | 401 sin token, 403 para estudiante |
+| `PATCH /courses/:id` | Admin o docente propietario | 401 sin token, 403 para estudiante o docente ajeno |
+| `DELETE /courses/:id` | Solo admin | 401 sin token, 403 para cualquier otro rol |
+
+`JwtAuthGuard` comprueba primero identidad; `RolesGuard` aplica los metadatos de `@Roles()`. La modificación también valida en `CoursesService` que el `id` del usuario autenticado sea el propietario. Los cursos antiguos sin propietario solo los puede actualizar un admin. El propietario se asigna desde `req.user`, nunca desde el cuerpo del cliente.
+
+Para asignar de forma controlada los roles a cuentas locales ya registradas, ejecuta en tu base de práctica:
+
+```sql
+UPDATE users SET role = 'admin' WHERE email = 'admin.practice@example.local';
+UPDATE users SET role = 'teacher' WHERE email = 'teacher.practice@example.local';
+UPDATE users SET role = 'student' WHERE email = 'student.practice@example.local';
+```
+
+Inicia sesión de nuevo después de cambiar roles para obtener tokens actualizados. Configura contraseñas de práctica y `practiceOtherCourseId` (el id de un curso local existente) en el entorno local del cliente HTTP y ejecuta [`requests/roles-permissions.http`](requests/roles-permissions.http). Para probar la eliminación, establece ese id a un curso desechable y sin matrículas. Las claves mínimas para autorizar son `id`, `email` y `role`; `id` y `role` provienen del JWT firmado y el cuerpo no puede declarar propiedad.
+
+En `development`, `synchronize` crea los campos y la relación de propiedad. En `test` y `production`, donde `synchronize` está desactivado, el esquema debe actualizarse mediante una migración antes de desplegar esta versión.
 
 Usa solo cuentas y datos de práctica. El token puede aparecer en la respuesta del login del cliente HTTP; no lo muestres completo en evidencia pública ni lo copies al archivo.

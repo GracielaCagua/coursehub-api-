@@ -17,8 +17,12 @@ import { AuthController } from '../src/auth/auth.controller';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { AuthService } from '../src/auth/auth.service';
 import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
+import { RolesGuard } from '../src/auth/guards/roles.guard';
+import { CoursesController } from '../src/courses/courses.controller';
+import { CoursesService } from '../src/courses/courses.service';
 import { EnrollmentsController } from '../src/enrollments/enrollments.controller';
 import { EnrollmentsService } from '../src/enrollments/enrollments.service';
+import { UserRole } from '../src/users/user-role.enum';
 
 const JWT_SECRET = 'test-secret-with-at-least-thirty-two-characters';
 
@@ -29,6 +33,11 @@ describe('JWT protected routes', () => {
   const enrollmentsService = {
     create: jest.fn(),
   };
+  const coursesService = {
+    create: jest.fn(),
+    update: jest.fn(),
+    remove: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -37,9 +46,10 @@ describe('JWT protected routes', () => {
         PassportModule.register({ session: false }),
         JwtModule.register({ secret: JWT_SECRET }),
       ],
-      controllers: [AuthController, EnrollmentsController],
+      controllers: [AuthController, EnrollmentsController, CoursesController],
       providers: [
         JwtAuthGuard,
+        RolesGuard,
         JwtStrategy,
         {
           provide: ConfigService,
@@ -47,6 +57,7 @@ describe('JWT protected routes', () => {
         },
         { provide: AuthService, useValue: {} },
         { provide: EnrollmentsService, useValue: enrollmentsService },
+        { provide: CoursesService, useValue: coursesService },
       ],
     }).compile();
 
@@ -76,7 +87,7 @@ describe('JWT protected routes', () => {
       .get('/auth/me')
       .set('Authorization', `Bearer ${validToken}`)
       .expect(200)
-      .expect({ id: 1, email: 'demo@example.com' });
+      .expect({ id: 1, email: 'demo@example.com', role: UserRole.STUDENT });
   });
 
   it('rejects missing, malformed, altered, expired, and invalid-payload tokens', async () => {
@@ -88,6 +99,11 @@ describe('JWT protected routes', () => {
     const invalidPayloadToken = await jwtService.signAsync({
       sub: '1',
       email: 'demo@example.com',
+    });
+    const invalidRoleToken = await jwtService.signAsync({
+      sub: 1,
+      email: 'demo@example.com',
+      role: 'administrator',
     });
 
     await request(app.getHttpServer()).get('/auth/me').expect(401);
@@ -106,6 +122,10 @@ describe('JWT protected routes', () => {
     await request(app.getHttpServer())
       .get('/auth/me')
       .set('Authorization', `Bearer ${invalidPayloadToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${invalidRoleToken}`)
       .expect(401);
   });
 
@@ -145,5 +165,60 @@ describe('JWT protected routes', () => {
       studentId: 1,
       courseId: 1,
     });
+  });
+
+  it('returns 401 for a missing token and 403 for non-admin course deletion', async () => {
+    const teacherToken = await jwtService.signAsync({
+      sub: 2,
+      email: 'teacher@example.com',
+      role: UserRole.TEACHER,
+    });
+
+    await request(app.getHttpServer()).delete('/courses/1').expect(401);
+    await request(app.getHttpServer())
+      .delete('/courses/1')
+      .set('Authorization', `Bearer ${validToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .delete('/courses/1')
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .expect(403);
+
+    expect(coursesService.remove).not.toHaveBeenCalled();
+  });
+
+  it('allows an administrator to delete a course', async () => {
+    const adminToken = await jwtService.signAsync({
+      sub: 3,
+      email: 'admin@example.com',
+      role: UserRole.ADMIN,
+    });
+
+    await request(app.getHttpServer())
+      .delete('/courses/1')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(coursesService.remove).toHaveBeenCalledWith(1);
+  });
+
+  it('allows a teacher through the role guard for course updates', async () => {
+    const teacherToken = await jwtService.signAsync({
+      sub: 2,
+      email: 'teacher@example.com',
+      role: UserRole.TEACHER,
+    });
+
+    await request(app.getHttpServer())
+      .patch('/courses/1')
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({ title: 'Updated' })
+      .expect(200);
+
+    expect(coursesService.update).toHaveBeenCalledWith(
+      1,
+      { title: 'Updated' },
+      { id: 2, email: 'teacher@example.com', role: UserRole.TEACHER },
+    );
   });
 });
