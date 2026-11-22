@@ -1,5 +1,4 @@
 import { jest } from '@jest/globals';
-import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
@@ -52,44 +51,12 @@ describe('CoursesService', () => {
     courseRepository.create.mockReturnValue(course);
     courseRepository.save.mockResolvedValue(course);
 
-    await service.create(
-      { title: 'NestJS', level: 'beginner' },
-      owner,
-    );
+    await service.create({ title: 'NestJS', level: 'beginner' }, owner);
 
     expect(courseRepository.create).toHaveBeenCalledWith({
       title: 'NestJS',
       level: 'beginner',
       createdBy: { id: owner.id },
     });
-  });
-
-  it('allows the teacher who owns a course to update it', async () => {
-    courseRepository.findOne.mockResolvedValue(course);
-    courseRepository.save.mockResolvedValue(course);
-
-    await expect(
-      service.update(5, { title: 'Updated' }, owner),
-    ).resolves.toBe(course);
-  });
-
-  it('rejects a teacher who does not own a course', async () => {
-    courseRepository.findOne.mockResolvedValue(course);
-    const otherTeacher = { ...owner, id: 8 };
-
-    await expect(
-      service.update(5, { title: 'Updated' }, otherTeacher),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(courseRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('allows an administrator to update any course', async () => {
-    courseRepository.findOne.mockResolvedValue(course);
-    courseRepository.save.mockResolvedValue(course);
-    const admin = { ...owner, id: 9, role: UserRole.ADMIN };
-
-    await expect(
-      service.update(5, { title: 'Updated' }, admin),
-    ).resolves.toBe(course);
   });
 });

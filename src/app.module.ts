@@ -1,4 +1,4 @@
-import { Logger, Module } from '@nestjs/common';
+import { Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -10,6 +10,7 @@ import { StudentsModule } from './students/students.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { RequestLoggingMiddleware } from './common/request-logging.middleware';
 
 @Module({
   imports: [
@@ -24,9 +25,7 @@ import { AuthModule } from './auth/auth.module';
         LOG_LEVEL: Joi.string()
           .valid('debug', 'log', 'warn', 'error')
           .default('log'),
-        CORS_ORIGINS: Joi.string()
-          .min(1)
-          .default('http://localhost:5173'),
+        CORS_ORIGINS: Joi.string().min(1).default('http://localhost:5173'),
         DB_HOST: Joi.string().required(),
         DB_PORT: Joi.number().port().default(5432),
         DB_NAME: Joi.string().required(),
@@ -76,4 +75,8 @@ import { AuthModule } from './auth/auth.module';
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RequestLoggingMiddleware).forRoutes('*');
+  }
+}

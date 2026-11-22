@@ -5,6 +5,11 @@ import { AuthModule } from '../auth/auth.module';
 import { CoursesController } from './courses.controller';
 import { CoursesService } from './courses.service';
 import { Course } from './entities/course.entity';
+import {
+  COURSE_UPDATE_REPOSITORY,
+  UpdateCourseUseCase,
+} from './application/update-course.use-case';
+import { TypeOrmCourseUpdateRepository } from './infrastructure/typeorm-course-update.repository';
 
 @Module({
   imports: [
@@ -13,7 +18,15 @@ import { Course } from './entities/course.entity';
     PassportModule.register({ session: false }),
   ],
   controllers: [CoursesController],
-  providers: [CoursesService],
+  providers: [
+    CoursesService,
+    UpdateCourseUseCase,
+    TypeOrmCourseUpdateRepository,
+    {
+      provide: COURSE_UPDATE_REPOSITORY,
+      useExisting: TypeOrmCourseUpdateRepository,
+    },
+  ],
   exports: [CoursesService],
 })
 export class CoursesModule {}

@@ -203,19 +203,19 @@ Los parámetros inválidos responden 400 sin llegar al repositorio.
 
 ### Variables de entorno
 
-| Variable         | Obligatoria | Por defecto   | Descripción                                                 |
-| ---------------- | ----------- | ------------- | ----------------------------------------------------------- |
-| `NODE_ENV`       | No          | `development` | `development`, `test` o `production`                        |
-| `PORT`           | No          | `3000`        | Puerto de la API                                            |
-| `LOG_LEVEL`      | No          | `log`         | `debug`, `log`, `warn` o `error`                            |
-| `CORS_ORIGINS`   | No          | `http://localhost:5173` | Orígenes web permitidos, separados por comas |
-| `DB_HOST`        | Sí          | —             | Host de PostgreSQL                                          |
-| `DB_PORT`        | No          | `5432`        | Puerto de PostgreSQL                                        |
-| `DB_NAME`        | Sí          | —             | Nombre de la base de datos                                  |
-| `DB_USER`        | Sí          | —             | Usuario de PostgreSQL                                       |
-| `DB_PASSWORD`    | Sí          | —             | Contraseña de PostgreSQL                                    |
-| `JWT_SECRET`     | Sí          | —             | Secreto aleatorio de al menos 32 caracteres; no se comparte |
-| `JWT_EXPIRES_IN` | No          | `15m`         | Duración del token de acceso                                |
+| Variable         | Obligatoria | Por defecto             | Descripción                                                 |
+| ---------------- | ----------- | ----------------------- | ----------------------------------------------------------- |
+| `NODE_ENV`       | No          | `development`           | `development`, `test` o `production`                        |
+| `PORT`           | No          | `3000`                  | Puerto de la API                                            |
+| `LOG_LEVEL`      | No          | `log`                   | `debug`, `log`, `warn` o `error`                            |
+| `CORS_ORIGINS`   | No          | `http://localhost:5173` | Orígenes web permitidos, separados por comas                |
+| `DB_HOST`        | Sí          | —                       | Host de PostgreSQL                                          |
+| `DB_PORT`        | No          | `5432`                  | Puerto de PostgreSQL                                        |
+| `DB_NAME`        | Sí          | —                       | Nombre de la base de datos                                  |
+| `DB_USER`        | Sí          | —                       | Usuario de PostgreSQL                                       |
+| `DB_PASSWORD`    | Sí          | —                       | Contraseña de PostgreSQL                                    |
+| `JWT_SECRET`     | Sí          | —                       | Secreto aleatorio de al menos 32 caracteres; no se comparte |
+| `JWT_EXPIRES_IN` | No          | `15m`                   | Duración del token de acceso                                |
 
 Las variables se validan con Joi al iniciar. Si falta una obligatoria o tiene un valor inválido, la API no arranca e indica cuál es.
 
@@ -251,11 +251,11 @@ export class AddCreditsToCourses1729200000000 implements MigrationInterface {
 
 ### Endpoints de acceso
 
-| Método | Ruta             | Éxito                                                 | Errores                                         |
-| ------ | ---------------- | ----------------------------------------------------- | ----------------------------------------------- |
-| POST   | `/auth/register` | 201 `{ id, email, role, createdAt }`                             | 400 cuerpo inválido · 409 correo ya registrado  |
-| POST   | `/auth/login`    | 200 `{ accessToken, user: { id, email, role, createdAt } }`     | 400 cuerpo inválido · 401 `Invalid credentials` |
-| GET    | `/auth/me`       | 200 `{ id, email, role }` con JWT Bearer válido                  | 401 token ausente, inválido o expirado          |
+| Método | Ruta             | Éxito                                                       | Errores                                         |
+| ------ | ---------------- | ----------------------------------------------------------- | ----------------------------------------------- |
+| POST   | `/auth/register` | 201 `{ id, email, role, createdAt }`                        | 400 cuerpo inválido · 409 correo ya registrado  |
+| POST   | `/auth/login`    | 200 `{ accessToken, user: { id, email, role, createdAt } }` | 400 cuerpo inválido · 401 `Invalid credentials` |
+| GET    | `/auth/me`       | 200 `{ id, email, role }` con JWT Bearer válido             | 401 token ausente, inválido o expirado          |
 
 Ambas rutas reciben `{ "email": string, "password": string }`. El correo se recorta y pasa a minúsculas; la contraseña debe tener entre 8 y 72 caracteres (bcrypt solo usa los primeros 72 bytes).
 `POST /enrollments` también requiere un JWT Bearer. Las rutas de lectura y cancelación de matrículas no se protegen en esta etapa.
@@ -306,11 +306,11 @@ Para demostrar el flujo de JWT (Sesión 17):
 
 `User.role` usa el enum `admin`, `teacher` o `student` y las cuentas nuevas quedan como `student`. El rol se incluye en el JWT y en `GET /auth/me`; los tokens de sesiones anteriores que no tengan rol se consideran `student`. No se acepta un rol fuera del enum.
 
-| Acción | Regla | Resultado si no cumple |
-| --- | --- | --- |
-| `POST /courses` | Admin o docente; quien crea queda como propietario | 401 sin token, 403 para estudiante |
-| `PATCH /courses/:id` | Admin o docente propietario | 401 sin token, 403 para estudiante o docente ajeno |
-| `DELETE /courses/:id` | Solo admin | 401 sin token, 403 para cualquier otro rol |
+| Acción                | Regla                                              | Resultado si no cumple                             |
+| --------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| `POST /courses`       | Admin o docente; quien crea queda como propietario | 401 sin token, 403 para estudiante                 |
+| `PATCH /courses/:id`  | Admin o docente propietario                        | 401 sin token, 403 para estudiante o docente ajeno |
+| `DELETE /courses/:id` | Solo admin                                         | 401 sin token, 403 para cualquier otro rol         |
 
 `JwtAuthGuard` comprueba primero identidad; `RolesGuard` aplica los metadatos de `@Roles()`. La modificación también valida en `CoursesService` que el `id` del usuario autenticado sea el propietario. Los cursos antiguos sin propietario solo los puede actualizar un admin. El propietario se asigna desde `req.user`, nunca desde el cuerpo del cliente.
 
@@ -334,8 +334,30 @@ La API permite únicamente los orígenes indicados por `CORS_ORIGINS` (separados
 
 En local se permite `http://localhost`. En producción todo el tráfico debe usar HTTPS/TLS, normalmente terminado por el proxy o balanceador. JWT, contraseñas y secretos deben transmitirse únicamente por HTTPS; los secretos se configuran en el entorno de despliegue y no se guardan en Git.
 
-Para verificar CORS con la página incluida en [`requests/cors-check.html`](requests/cors-check.html), abre una terminal en la raíz del proyecto y ejecuta `python -m http.server 5173 --directory requests`; abre `http://localhost:5173/cors-check.html` y pulsa el botón, que debe mostrar `HTTP 200`. En otra terminal ejecuta `python -m http.server 5174 --directory requests` y abre la misma página en `http://localhost:5174/cors-check.html`; el navegador debe bloquear la lectura y mostrar el mensaje de error. CORS no impide que la solicitud llegue al servidor. Aun desde el origen permitido, `GET /auth/me` sin Bearer sigue respondiendo `401`.
+Para verificar CORS con la página incluida en [`requests/cors-check.html`](requests/cors-check.html), abre una terminal en la raíz del proyecto y ejecuta `python -m http.server 5173 --bind 127.0.0.1 --directory requests`; abre `http://localhost:5173/cors-check.html` y pulsa `Probar GET /courses (público)`, que debe mostrar `HTTP 200`. Pulsa `Probar GET /auth/me (sin token)` para comprobar que un origen permitido sigue recibiendo `401` si falta la identidad. En otra terminal ejecuta `python -m http.server 5174 --bind 127.0.0.1 --directory requests` y abre la misma página en `http://localhost:5174/cors-check.html`; el navegador debe bloquear la lectura y mostrar el mensaje de error. CORS no impide que la solicitud llegue al servidor.
 
 Ejecuta `npm run test:throttling` para verificar localmente que las primeras cinco solicitudes al login pasan y la sexta devuelve `429`. En Thunder Client, una vez que pase un minuto o reinicies la API, también puedes enviar seis solicitudes `POST /auth/login` seguidas con un cuerpo válido para observar el mismo límite.
 
 Usa solo cuentas y datos de práctica. El token puede aparecer en la respuesta del login del cliente HTTP; no lo muestres completo en evidencia pública ni lo copies al archivo.
+
+## Etapa 3 · Semana 11 · Arquitectura mantenible y comportamiento transversal
+
+### Componentes transversales
+
+- `RequestLoggingMiddleware` se aplica una sola vez a las rutas de la API. Registra método, patrón de ruta, estado HTTP y duración; no registra URL completa, query string, encabezados ni cuerpo.
+- `ApiExceptionFilter` se aplica globalmente. Los errores HTTP mantienen una forma `{ "statusCode", "message", "error" }`; los errores inesperados responden `500` con un mensaje genérico, sin traza ni detalles internos.
+- `TimingInterceptor` se aplica globalmente desde `main.ts` y registra la duración del handler al completar o fallar. No transforma la respuesta ni consume las excepciones; el middleware registra además el tiempo total de la solicitud.
+- `ValidationPipe` es global y `ParseIntPipe` valida parámetros numéricos de ruta. Las pruebas del filter provocan una excepción inesperada de forma aislada, sin exponer una ruta de fallo intencional en la API.
+
+### Regla de actualización de cursos
+
+`CoursesController` traduce HTTP y delega la actualización a `UpdateCourseUseCase`. El caso de uso depende del contrato pequeño `CourseUpdateRepository`, no de Nest HTTP ni de TypeORM. La regla de propietario (o administrador) está dentro del caso de uso. `TypeOrmCourseUpdateRepository` adapta ese contrato a la entidad y al repositorio TypeORM. Las pruebas del caso de uso usan un repositorio falso, sin iniciar rutas ni una base de datos.
+
+### Demostración (hasta ocho minutos)
+
+1. Inicia la API localmente y configura una cuenta docente de práctica y `practiceOtherCourseId` en el cliente HTTP. Ese id debe ser de un curso cuyo propietario sea otra cuenta docente.
+2. Ejecuta las solicitudes de [`requests/architecture-week11.http`](requests/architecture-week11.http): actualización correcta `200`, id inválido `400`, curso inexistente `404` y docente ajena `403`.
+3. En el código, señala el controlador (`courses.controller.ts`), la regla desacoplada (`application/update-course.use-case.ts`), el contrato del repositorio en ese mismo archivo y el adaptador de persistencia (`infrastructure/typeorm-course-update.repository.ts`).
+4. Señala la aplicación transversal única en `app.module.ts` y `main.ts`, y las pruebas aisladas del caso de uso y del formato de errores.
+
+Ejecuta `npm test -- --runInBand` y `npm run build` para validar la etapa. Usa únicamente cuentas locales de práctica y no incluyas tokens ni credenciales en capturas.

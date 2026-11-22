@@ -3,25 +3,33 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CourseHub CORS check</title>
+    <title>Comprobación CORS de CourseHub</title>
   </head>
   <body>
-    <h1>CourseHub CORS check</h1>
-    <button id="check">Request GET /courses</button>
-    <pre id="result">Click the button to test the API origin.</pre>
+    <h1>Comprobación CORS de CourseHub</h1>
+    <button id="public-check">Probar GET /courses (público)</button>
+    <button id="protected-check">Probar GET /auth/me (sin token)</button>
+    <pre id="result">Pulsa un botón para probar CORS y autenticación.</pre>
     <script>
       const result = document.querySelector('#result');
 
-      document.querySelector('#check').addEventListener('click', async () => {
-        result.textContent = 'Requesting...';
+      async function check(path) {
+        result.textContent = 'Consultando...';
         try {
-          const response = await fetch('http://localhost:3000/courses');
+          const response = await fetch(`http://localhost:3000${path}`);
           result.textContent = `HTTP ${response.status}\n${await response.text()}`;
         } catch {
           result.textContent =
-            'The browser could not read the response. Check CORS_ORIGINS and the browser console.';
+            'El navegador no pudo leer la respuesta. Revisa CORS_ORIGINS y la consola del navegador.';
         }
-      });
+      }
+
+      document
+        .querySelector('#public-check')
+        .addEventListener('click', () => check('/courses'));
+      document
+        .querySelector('#protected-check')
+        .addEventListener('click', () => check('/auth/me'));
     </script>
   </body>
 </html>

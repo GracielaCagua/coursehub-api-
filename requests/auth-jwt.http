@@ -1,7 +1,7 @@
 # Demo account: register it first with requests/auth.http, or set existing practice credentials here.
 @baseUrl = http://localhost:3000
 @email = demo.semana8@example.com
-@password = aprendo-nest-2026
+@password = 12345678
 @accessToken = {{loginPractica.response.body.$.accessToken}}
 @studentId = 1
 @courseId = 1

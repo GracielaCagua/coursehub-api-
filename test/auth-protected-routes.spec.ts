@@ -27,8 +27,7 @@ const { ConfigService } = await import('@nestjs/config');
 const { APP_GUARD } = await import('@nestjs/core');
 const { JwtModule } = await import('@nestjs/jwt');
 const { PassportModule } = await import('@nestjs/passport');
-const { ThrottlerGuard, ThrottlerModule } =
-  await import('@nestjs/throttler');
+const { ThrottlerGuard, ThrottlerModule } = await import('@nestjs/throttler');
 const { Test } = await import('@nestjs/testing');
 const { default: request } = await import('supertest');
 const { AuthController } = await import('../src/auth/auth.controller');
@@ -36,8 +35,12 @@ const { AuthService } = await import('../src/auth/auth.service');
 const { JwtAuthGuard } = await import('../src/auth/guards/jwt-auth.guard');
 const { RolesGuard } = await import('../src/auth/guards/roles.guard');
 const { JwtStrategy } = await import('../src/auth/strategies/jwt.strategy');
+const { ApiExceptionFilter } =
+  await import('../src/common/api-exception.filter');
 const { CoursesController } = await import('../src/courses/courses.controller');
 const { CoursesService } = await import('../src/courses/courses.service');
+const { CourseNotFoundError, CourseOwnershipError, UpdateCourseUseCase } =
+  await import('../src/courses/application/update-course.use-case');
 const { EnrollmentsController } =
   await import('../src/enrollments/enrollments.controller');
 const { EnrollmentsService } =
@@ -63,8 +66,16 @@ describe('JWT protected routes', () => {
   };
   const coursesService = {
     create: jest.fn(),
-    update: jest.fn(),
     remove: jest.fn(),
+  };
+  const updateCourseUseCase = {
+    execute: jest.fn().mockResolvedValue({
+      id: 1,
+      title: 'Updated',
+      level: 'beginner',
+      isPublished: true,
+      createdById: 2,
+    }),
   };
 
   beforeEach(async () => {
@@ -88,6 +99,7 @@ describe('JWT protected routes', () => {
         { provide: AuthService, useValue: authService },
         { provide: EnrollmentsService, useValue: enrollmentsService },
         { provide: CoursesService, useValue: coursesService },
+        { provide: UpdateCourseUseCase, useValue: updateCourseUseCase },
       ],
     }).compile();
 
@@ -98,6 +110,7 @@ describe('JWT protected routes', () => {
     });
 
     app = moduleRef.createNestApplication();
+    app.useGlobalFilters(new ApiExceptionFilter());
     configureCors(app, 'http://localhost:5173');
     app.useGlobalPipes(
       new ValidationPipe({
@@ -244,13 +257,85 @@ describe('JWT protected routes', () => {
       .patch('/courses/1')
       .set('Authorization', `Bearer ${teacherToken}`)
       .send({ title: 'Updated' })
-      .expect(200);
+      .expect(200)
+      .expect({
+        id: 1,
+        title: 'Updated',
+        level: 'beginner',
+        isPublished: true,
+        createdBy: { id: 2 },
+      });
 
-    expect(coursesService.update).toHaveBeenCalledWith(
+    expect(updateCourseUseCase.execute).toHaveBeenCalledWith(
       1,
       { title: 'Updated' },
       { id: 2, email: 'teacher@example.com', role: UserRole.TEACHER },
     );
+  });
+
+  it('returns a consistent 400 for an invalid course id before running the use case', async () => {
+    const teacherToken = await jwtService.signAsync({
+      sub: 2,
+      email: 'teacher@example.com',
+      role: UserRole.TEACHER,
+    });
+
+    await request(app.getHttpServer())
+      .patch('/courses/not-a-number')
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({ title: 'Updated' })
+      .expect(400)
+      .expect({
+        statusCode: 400,
+        message: 'Validation failed (numeric string is expected)',
+        error: 'Bad Request',
+      });
+
+    expect(updateCourseUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('maps a missing course from the use case to a consistent 404', async () => {
+    const teacherToken = await jwtService.signAsync({
+      sub: 2,
+      email: 'teacher@example.com',
+      role: UserRole.TEACHER,
+    });
+    updateCourseUseCase.execute.mockRejectedValueOnce(
+      new CourseNotFoundError(999),
+    );
+
+    await request(app.getHttpServer())
+      .patch('/courses/999')
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({ title: 'Updated' })
+      .expect(404)
+      .expect({
+        statusCode: 404,
+        message: 'No existe un curso con el ID 999',
+        error: 'Not Found',
+      });
+  });
+
+  it('maps a failed ownership rule to a consistent 403', async () => {
+    const teacherToken = await jwtService.signAsync({
+      sub: 2,
+      email: 'teacher@example.com',
+      role: UserRole.TEACHER,
+    });
+    updateCourseUseCase.execute.mockRejectedValueOnce(
+      new CourseOwnershipError(),
+    );
+
+    await request(app.getHttpServer())
+      .patch('/courses/1')
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({ title: 'Updated' })
+      .expect(403)
+      .expect({
+        statusCode: 403,
+        message: 'You cannot modify this course',
+        error: 'Forbidden',
+      });
   });
 
   it('allows CORS only from the configured origin without bypassing JWT auth', async () => {

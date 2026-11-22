@@ -1,0 +1,47 @@
+@baseUrl = http://localhost:3000
+@teacherEmail = teacher.practice@example.local
+@teacherPassword = {{teacherPracticePassword}}
+@teacherOtherCourseId = {{practiceOtherCourseId}}
+
+### Inicia sesión con una cuenta docente de práctica
+# @name loginTeacher
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{teacherEmail}}", "password": "{{teacherPassword}}" }
+
+### Crea un curso que pertenece a la docente de práctica
+# @name createOwnedCourse
+POST {{baseUrl}}/courses
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "Curso de arquitectura de práctica", "level": "beginner" }
+
+### Solicitud correcta: la propietaria actualiza su curso → 200
+PATCH {{baseUrl}}/courses/{{createOwnedCourse.response.body.$.id}}
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "Curso actualizado por su propietaria" }
+
+### Identificador inválido → 400
+PATCH {{baseUrl}}/courses/no-es-un-id
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "No debe actualizarse" }
+
+### Recurso inexistente → 404
+PATCH {{baseUrl}}/courses/2147483647
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "No debe actualizarse" }
+
+### Prohibida: docente autenticada que no es propietaria → 403
+PATCH {{baseUrl}}/courses/{{teacherOtherCourseId}}
+Authorization: Bearer {{loginTeacher.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "title": "No debe actualizarse" }
