@@ -21,10 +21,9 @@ import { TypeOrmCourseUpdateRepository } from './infrastructure/typeorm-course-u
   providers: [
     CoursesService,
     UpdateCourseUseCase,
-    TypeOrmCourseUpdateRepository,
     {
       provide: COURSE_UPDATE_REPOSITORY,
-      useExisting: TypeOrmCourseUpdateRepository,
+      useClass: TypeOrmCourseUpdateRepository,
     },
   ],
   exports: [CoursesService],
