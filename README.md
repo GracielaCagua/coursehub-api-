@@ -361,3 +361,15 @@ Usa solo cuentas y datos de práctica. El token puede aparecer en la respuesta d
 4. Señala la aplicación transversal única en `app.module.ts` y `main.ts`, y las pruebas aisladas del caso de uso y del formato de errores.
 
 Ejecuta `npm test -- --runInBand` y `npm run build` para validar la etapa. Usa únicamente cuentas locales de práctica y no incluyas tokens ni credenciales en capturas.
+
+## Etapa 4 · Semana 12 · Pruebas unitarias que protegen reglas
+
+Las pruebas unitarias del `UpdateCourseUseCase` usan un repositorio simulado y cubren actualización autorizada, curso inexistente y rechazo de un docente que no es propietario. La prueba del controlador verifica que delega el identificador, el DTO y el usuario autenticado al caso de uso. No se conectan a PostgreSQL ni realizan solicitudes de red.
+
+Ejecuta la suite completa con `npm test -- --runInBand`.
+
+### Demostración de la regla protegida
+
+1. Ejecuta primero `npm test -- --runInBand`.
+2. En `src/courses/application/update-course.use-case.ts`, comenta temporalmente la condición de propiedad y el `throw new CourseOwnershipError()`. Ejecuta `npm test -- --runInBand src/courses/application/update-course.use-case.spec.ts`: la prueba de docente ajeno debe fallar porque ya no se rechaza la actualización.
+3. Restaura la regla y vuelve a ejecutar `npm test -- --runInBand`. Si se borrara esa prueba, una regresión que permita a cualquier docente modificar cursos ajenos quedaría sin protección unitaria.
