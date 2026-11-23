@@ -364,9 +364,9 @@ Ejecuta `npm test -- --runInBand` y `npm run build` para validar la etapa. Usa �
 
 ## Etapa 4 · Semana 12 · Pruebas unitarias que protegen reglas
 
-Las pruebas unitarias del `UpdateCourseUseCase` usan un repositorio simulado y cubren actualización autorizada, curso inexistente y rechazo de un docente que no es propietario. La prueba del controlador verifica que delega el identificador, el DTO y el usuario autenticado al caso de uso. No se conectan a PostgreSQL ni realizan solicitudes de red.
+Las pruebas unitarias del `UpdateCourseUseCase` usan un repositorio simulado y cubren actualización autorizada, curso inexistente y rechazo de un docente que no es propietario. Las pruebas del controlador verifican que delega el identificador, el DTO y el usuario autenticado, traduce los errores de negocio a `404`/`403` y vuelve a propagar errores inesperados. No se conectan a PostgreSQL ni realizan solicitudes de red.
 
-Ejecuta la suite completa con `npm test -- --runInBand`.
+Ejecuta la suite completa con `npm test -- --runInBand`; para revisar cobertura usa `npm test -- --coverage`.
 
 ### Demostración de la regla protegida
 
