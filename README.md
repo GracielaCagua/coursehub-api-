@@ -383,3 +383,11 @@ Las pruebas e2e inician la aplicación NestJS y envían solicitudes HTTP con Sup
 3. Ejecuta `npm run test:e2e -- --runInBand` dos veces. El entorno de pruebas solo permite la base `coursehub_test` y sincroniza allí el esquema.
 
 La suite comprueba la ruta pública `GET /courses`, la creación autenticada de un curso con rol docente y que `POST /courses` sin token responda `401`. La prueba de escritura elimina el curso y el usuario de prueba al terminar, por lo que las ejecuciones son repetibles.
+
+### Integración continua y revisión de dependencias
+
+El flujo `.github/workflows/quality.yml` se ejecuta en cada `push` y `pull_request`. Instala desde `package-lock.json` con `npm ci`, ejecuta lint, pruebas unitarias, e2e contra un servicio PostgreSQL temporal y la compilación. En pull requests, Dependency Review bloquea nuevas dependencias con severidad moderada o superior; requiere que el repositorio sea público o tenga GitHub Advanced Security habilitado.
+
+La auditoría local `npm audit` del 2026-11-24 reportó 33 vulnerabilidades en el árbol de dependencias (2 críticas, 7 altas, 22 moderadas y 2 bajas). No se aplicó `npm audit fix --force`, porque npm advierte que puede introducir cambios incompatibles. Dependency Review detecta vulnerabilidades introducidas por cambios en el pull request; los hallazgos preexistentes requieren una revisión y actualización planificadas.
+
+Se comprobó la señal de fallo con una expectativa incorrecta temporal: Jest terminó con código `1`. La prueba temporal se retiró; el conjunto completo volvió a pasar antes de integrar cambios.
