@@ -373,3 +373,13 @@ Ejecuta la suite completa con `npm test -- --runInBand`; para revisar cobertura 
 1. Ejecuta primero `npm test -- --runInBand`.
 2. En `src/courses/application/update-course.use-case.ts`, comenta temporalmente la condición de propiedad y el `throw new CourseOwnershipError()`. Ejecuta `npm test -- --runInBand src/courses/application/update-course.use-case.spec.ts`: la prueba de docente ajeno debe fallar porque ya no se rechaza la actualización.
 3. Restaura la regla y vuelve a ejecutar `npm test -- --runInBand`. Si se borrara esa prueba, una regresión que permita a cualquier docente modificar cursos ajenos quedaría sin protección unitaria.
+
+## Etapa 4 · Semana 13 · Pruebas e2e
+
+Las pruebas e2e inician la aplicación NestJS y envían solicitudes HTTP con Supertest. Para ejecutarlas contra una base aislada:
+
+1. Crea la base PostgreSQL `coursehub_test`.
+2. Copia `.env.test.example` a `.env.test.local` y completa localmente la contraseña de PostgreSQL. Este archivo está ignorado por Git; no compartas ni confirmes sus credenciales.
+3. Ejecuta `npm run test:e2e -- --runInBand` dos veces. El entorno de pruebas solo permite la base `coursehub_test` y sincroniza allí el esquema.
+
+La suite comprueba la ruta pública `GET /courses`, la creación autenticada de un curso con rol docente y que `POST /courses` sin token responda `401`. La prueba de escritura elimina el curso y el usuario de prueba al terminar, por lo que las ejecuciones son repetibles.

@@ -17,6 +17,8 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
     // Sesión 13: configuración global validada al iniciar
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath:
+        process.env.NODE_ENV === 'test' ? '.env.test.local' : '.env',
       validationSchema: Joi.object({
         NODE_ENV: Joi.string()
           .valid('development', 'test', 'production')
@@ -46,7 +48,14 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const nodeEnv = config.getOrThrow<string>('NODE_ENV');
-        const synchronize = nodeEnv === 'development';
+        const databaseName = config.getOrThrow<string>('DB_NAME');
+        if (nodeEnv === 'test' && databaseName !== 'coursehub_test') {
+          throw new Error(
+            'E2E tests may only use the dedicated coursehub_test database',
+          );
+        }
+        const synchronize =
+          nodeEnv === 'development' || nodeEnv === 'test';
 
         // Registro NO sensible: nunca se imprime la contraseña ni el objeto completo
         new Logger('Database').log(
@@ -59,7 +68,7 @@ import { RequestLoggingMiddleware } from './common/request-logging.middleware';
           port: config.getOrThrow<number>('DB_PORT'),
           username: config.getOrThrow<string>('DB_USER'),
           password: config.getOrThrow<string>('DB_PASSWORD'),
-          database: config.getOrThrow<string>('DB_NAME'),
+          database: databaseName,
           autoLoadEntities: true,
           synchronize,
         };
