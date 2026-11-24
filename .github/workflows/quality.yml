@@ -1,0 +1,77 @@
+name: Quality checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Lint, test, and build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: coursehub_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d coursehub_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test -- --runInBand
+
+      - name: Run end-to-end tests
+        run: npm run test:e2e -- --runInBand
+        env:
+          NODE_ENV: test
+          PORT: '3001'
+          LOG_LEVEL: error
+          CORS_ORIGINS: http://localhost:5173
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_NAME: coursehub_test
+          DB_USER: postgres
+          DB_PASSWORD: test-password
+          JWT_SECRET: e2e-ci-secret-for-github-actions-only-12345
+          JWT_EXPIRES_IN: 15m
+
+      - name: Build
+        run: npm run build
+
+  dependency-review:
+    name: Review dependency changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: never
